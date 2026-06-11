@@ -1,0 +1,545 @@
+-- Services declaration
+local playersService   = game:GetService("Players")
+local runService       = game:GetService("RunService")
+local workspaceService = game:GetService("Workspace")
+
+-- Client references
+local clientPlayer = playersService.LocalPlayer
+local PlayerGui    = clientPlayer:WaitForChild("PlayerGui", 10)
+
+-- Load WindUI library
+local WindUI = loadstring(game:HttpGet("https://github.com/Footagesus/WindUI/releases/latest/download/main.lua"))()
+
+-- Create main window
+local Window = WindUI:CreateWindow({
+    Title            = "V1PRSTAB",
+    Icon             = "sparkle",
+    Author           = "Maintained by Viper",
+    Folder           = "GlovSakenScript",
+    Size             = UDim2.fromOffset(350, 300),
+    Transparent      = false,
+    Theme            = "Dark",
+    Resizable        = false,
+    SideBarWidth     = 150,
+    HideSearchBar    = true,
+    ScrollBarEnabled = false,
+})
+
+Window:SetToggleKey(Enum.KeyCode.K)
+WindUI:SetFont("rbxasset://fonts/families/AccanthisADFStd.json")
+
+Window:EditOpenButton({
+    Title           = "V1PRSTAB",
+    Icon            = "sparkle",
+    CornerRadius    = UDim.new(0, 16),
+    StrokeThickness = 0,
+    Color = ColorSequence.new(
+        Color3.fromHex("000000"),
+        Color3.fromHex("000000")
+    ),
+    OnlyMobile = true,
+    Enabled    = true,
+    Draggable  = true,
+})
+
+----------------------------------------------------------------
+-- Backstab Tab
+----------------------------------------------------------------
+local BackstabTab = Window:Tab({
+    Title = "Backstab",
+    Icon  = "sword",
+})
+
+local SettingsSection = BackstabTab:Section({
+    Title  = "Settings",
+    Opened = true,
+})
+
+----------------------------------------------------------------
+-- CONFIG
+-- DaggerBackstabThreshold  = 70  (TwoTime Config — server cone)
+-- DaggerLookDirectionAngle = 70  (TwoTime Config — confirms 70°)
+-- Windup                   = 0.3s (TwoTime Config)
+-- DaggerCooldown           = 30s  (TwoTime Config)
+----------------------------------------------------------------
+local DEFAULT_PROXIMITY   = 8
+local DEFAULT_DURATION    = 0.45  -- how long to hold the lerp after trigger
+local BEHIND_DISTANCE     = 3.5   -- how far behind the killer to position
+local CHECK_INTERVAL      = 0.05
+local COOLDOWN            = 5     -- client re-arm guard
+local LERP_SPEED          = 0.55  -- snappier lerp
+
+-- Matches DaggerBackstabThreshold = 70 from Config exactly.
+local BEHIND_CONE_DEGREES = 70
+
+-- 0.0 = fire the instant detection confirms → fastest possible trigger
+local REMOTE_FIRE_DELAY   = 0.0
+
+-- Windup = 0.3s. Snap at 0.25s = 1 frame before hitbox activates.
+local AIM_SNAP_DELAY      = 0.25
+
+-- Debug line: draws a BillboardGui beam from player to killer when valid
+local DEBUG_LINE          = true
+
+-- Mutable state driven by UI
+local isRunning     = true
+local enabled       = false
+local daggerEnabled = false
+local rangeMode     = "Behind"
+local backstabType  = "Lerp"
+local proximity     = DEFAULT_PROXIMITY
+local lastTrigger   = 0
+local aimRefCount   = 0
+
+----------------------------------------------------------------
+-- Debug line helpers
+----------------------------------------------------------------
+local debugBeam = nil
+
+local function removeDebugLine()
+    if debugBeam then
+        pcall(function() debugBeam:Destroy() end)
+        debugBeam = nil
+    end
+end
+
+local function drawDebugLine(hrp, khrp, isValid)
+    if not DEBUG_LINE then removeDebugLine(); return end
+    pcall(function()
+        local att0 = hrp:FindFirstChild("__BSAtt0") or Instance.new("Attachment", hrp)
+        att0.Name = "__BSAtt0"
+        att0.Position = Vector3.zero
+
+        local att1 = khrp:FindFirstChild("__BSAtt1") or Instance.new("Attachment", khrp)
+        att1.Name = "__BSAtt1"
+        att1.Position = Vector3.zero
+
+        if not debugBeam then
+            local b = Instance.new("Beam")
+            b.Name           = "__BSBeam"
+            b.Attachment0    = att0
+            b.Attachment1    = att1
+            b.FaceCamera     = true
+            b.Width0         = 0.08
+            b.Width1         = 0.08
+            b.Segments       = 1
+            b.LightEmission  = 1
+            b.LightInfluence = 0
+            b.Parent         = hrp
+            debugBeam = b
+        end
+
+        debugBeam.Attachment0 = att0
+        debugBeam.Attachment1 = att1
+        debugBeam.Color = isValid
+            and ColorSequence.new(Color3.fromRGB(50, 220, 100))
+            or  ColorSequence.new(Color3.fromRGB(220, 80, 60))
+    end)
+end
+
+----------------------------------------------------------------
+-- Helper functions
+----------------------------------------------------------------
+local function getCharacter()
+    return clientPlayer.Character or clientPlayer.CharacterAdded:Wait()
+end
+
+local function getDaggerButton()
+    local pg        = clientPlayer:FindFirstChild("PlayerGui")
+    if not pg then return nil end
+    local mainUI    = pg:FindFirstChild("MainUI")
+    if not mainUI then return nil end
+    local container = mainUI:FindFirstChild("AbilityContainer")
+    if not container then return nil end
+    return container:FindFirstChild("Dagger")
+end
+
+local function getDaggerCooldown()
+    local btn = getDaggerButton()
+    if not btn then return nil end
+    return btn:FindFirstChild("CooldownTime")
+        or btn:FindFirstChild("Cooldown")
+        or btn:FindFirstChildWhichIsA("NumberValue")
+        or btn:FindFirstChildWhichIsA("StringValue")
+        or btn:FindFirstChild("CooldownLabel")
+        or btn:FindFirstChild("Timer")
+        or btn:FindFirstChild("CD")
+end
+
+local function readCooldownValue(cdObj)
+    if not cdObj then return nil end
+    if cdObj:IsA("NumberValue")  then return cdObj.Value end
+    if cdObj:IsA("StringValue")  then return tonumber(cdObj.Value) end
+    if cdObj:IsA("TextLabel") or cdObj:IsA("TextBox") then return tonumber(cdObj.Text) end
+    if type(cdObj.Value) == "number" then return cdObj.Value end
+    if type(cdObj.Value) == "string" then return tonumber(cdObj.Value) end
+    if cdObj.Text ~= nil             then return tonumber(cdObj.Text) end
+    return nil
+end
+
+local function getKillersFolder()
+    local playersFolder = workspaceService:FindFirstChild("Players")
+    if not playersFolder then return nil end
+    return playersFolder:FindFirstChild("Killers")
+end
+
+local function isValidKillerModel(model)
+    if not model then return false end
+    local hrp      = model:FindFirstChild("HumanoidRootPart")
+    local humanoid = model:FindFirstChildWhichIsA("Humanoid")
+    return hrp and humanoid and humanoid.Health and humanoid.Health > 0
+end
+
+local function tryActivateButton(btn)
+    if not btn then return false end
+    pcall(function() if btn.Activate then btn:Activate() end end)
+    local ok, conns = pcall(function()
+        if type(getconnections) == "function" and btn.MouseButton1Click then
+            return getconnections(btn.MouseButton1Click)
+        end
+        return nil
+    end)
+    if ok and conns then
+        for _, conn in ipairs(conns) do
+            pcall(function()
+                if conn.Function then conn.Function()
+                elseif conn.func  then conn.func()
+                elseif conn.Fire  then conn.Fire() end
+            end)
+        end
+    end
+    pcall(function() if btn.Activated then btn.Activated:Fire() end end)
+    return true
+end
+
+local function setAutoRotate(value)
+    local char = clientPlayer.Character
+    if not char then return end
+    local hum = char:FindFirstChildWhichIsA("Humanoid")
+    if hum then pcall(function() hum.AutoRotate = value end) end
+end
+
+----------------------------------------------------------------
+-- DETECTION — fixed: checks if PLAYER is in KILLER's rear arc
+--
+-- Old (wrong): toKillerUnit:Dot(-hrp.LookVector)
+--   → "is the killer behind the player"
+--
+-- New (correct): toPlayerUnit:Dot(-khrp.LookVector)
+--   → "is the player in the killer's rear cone"
+--   → mirrors DaggerBackstabThreshold = 70 on the server
+----------------------------------------------------------------
+local function isPlayerBehindKiller(hrp, khrp, dist)
+    if dist > proximity or dist < 0.01 then return false end
+
+    -- Unit vector pointing FROM the killer TO the player
+    local toPlayer = (hrp.Position - khrp.Position).Unit
+
+    -- Killer's back vector
+    local killerBack = -khrp.CFrame.LookVector
+
+    -- dot = 1.0 → player is dead behind killer
+    -- dot = 0.0 → player is to the side
+    -- dot = -1.0 → player is in front of killer (facing them)
+    local dot       = toPlayer:Dot(killerBack)
+    local threshold = math.cos(math.rad(BEHIND_CONE_DEGREES))
+
+    return dot >= threshold
+end
+
+----------------------------------------------------------------
+-- Aiming + lerp-behind logic
+-- Teleports/lerps Two Time to the killer's back, then snaps aim.
+----------------------------------------------------------------
+local function activateForKiller(killerModel, duration)
+    if not killerModel or not isRunning then return end
+    local char     = getCharacter()
+    local humanoid = char and char:FindFirstChildWhichIsA("Humanoid")
+    local hrp      = char and char:FindFirstChild("HumanoidRootPart")
+    local khrp     = killerModel:FindFirstChild("HumanoidRootPart")
+    if not humanoid or not hrp or not khrp then return end
+
+    aimRefCount += 1
+    if aimRefCount == 1 then pcall(function() humanoid.AutoRotate = false end) end
+
+    local function finishAiming()
+        aimRefCount = math.max(0, aimRefCount - 1)
+        if aimRefCount == 0 then setAutoRotate(true) end
+    end
+
+    -- Position directly behind killer, facing the same direction as the killer
+    -- so the dagger stab goes into their back.
+    local function computeBehindCFrame()
+        local kCF       = khrp.CFrame
+        local behindPos = kCF.Position - (kCF.LookVector.Unit * BEHIND_DISTANCE)
+        behindPos = Vector3.new(behindPos.X, kCF.Position.Y, behindPos.Z)
+        -- Face the same way as the killer (stab into their back)
+        return CFrame.new(behindPos, behindPos + kCF.LookVector.Unit)
+    end
+
+    if backstabType == "Lerp" then
+        local t0 = os.clock()
+        local conn
+        conn = runService.Heartbeat:Connect(function()
+            if not isRunning or os.clock() - t0 >= duration then
+                conn:Disconnect(); finishAiming(); return
+            end
+            if khrp and hrp then
+                hrp.CFrame = hrp.CFrame:Lerp(computeBehindCFrame(), LERP_SPEED)
+            end
+        end)
+
+    elseif backstabType == "Teleport" then
+        -- Instant snap behind killer
+        pcall(function() hrp.CFrame = computeBehindCFrame() end)
+        task.delay(duration, finishAiming)
+
+    elseif backstabType == "Aim" then
+        -- Stay in place, only rotate to face killer's back
+        local t0 = os.clock()
+        local conn
+        conn = runService.Heartbeat:Connect(function()
+            if not isRunning or os.clock() - t0 >= duration then
+                conn:Disconnect(); finishAiming(); return
+            end
+            if khrp and hrp then
+                -- Aim at a point PAST the killer (same direction they face),
+                -- so Two Time's stab connects with the back
+                local stabTarget = khrp.Position + khrp.CFrame.LookVector * 2
+                local aimPos     = Vector3.new(stabTarget.X, hrp.Position.Y, stabTarget.Z)
+                hrp.CFrame = hrp.CFrame:Lerp(
+                    CFrame.new(hrp.Position, aimPos),
+                    LERP_SPEED * 1.8
+                )
+            end
+        end)
+    end
+end
+
+----------------------------------------------------------------
+-- Main watcher
+----------------------------------------------------------------
+task.spawn(function()
+    while isRunning do
+        task.wait(CHECK_INTERVAL)
+        if not enabled or not isRunning then continue end
+
+        local killersFolder = getKillersFolder()
+        if not killersFolder then continue end
+
+        local char = getCharacter()
+        local hrp  = char and char:FindFirstChild("HumanoidRootPart")
+        if not hrp then continue end
+
+        local triggered = false
+
+        for _, killer in pairs(killersFolder:GetChildren()) do
+            if triggered then break end
+            if not isValidKillerModel(killer) then continue end
+
+            local khrp = killer:FindFirstChild("HumanoidRootPart")
+            local dist = (khrp.Position - hrp.Position).Magnitude
+
+            -- Draw debug line whenever in range (green = valid, red = wrong angle)
+            if dist <= proximity then
+                local valid = isPlayerBehindKiller(hrp, khrp, dist)
+                drawDebugLine(hrp, khrp, valid)
+
+                if valid
+                and rangeMode ~= "Around" -- "Around" skips angle check
+                and os.clock() - lastTrigger >= COOLDOWN then
+
+                    local cdNum = readCooldownValue(getDaggerCooldown())
+                    if not (cdNum and cdNum > 0.1) then
+                        lastTrigger = os.clock()
+                        triggered   = true
+
+                        task.spawn(function()
+                            -- 1. Immediately start lerping behind the killer.
+                            --    This runs concurrently with steps 2-4.
+                            activateForKiller(killer, DEFAULT_DURATION)
+
+                            -- 2. Fire the dagger remote instantly (0s delay by default).
+                            --    The 0.3s server windup begins now.
+                            --    We're already moving behind them, so by the time
+                            --    the hitbox activates we'll be in position.
+                            if REMOTE_FIRE_DELAY > 0 then
+                                task.wait(REMOTE_FIRE_DELAY)
+                            end
+                            if daggerEnabled then
+                                tryActivateButton(getDaggerButton())
+                            end
+
+                            -- 3. Late-snap: at 0.25s (just before the 0.3s hitbox),
+                            --    hard-lock aim onto killer's current position so any
+                            --    movement during windup is accounted for.
+                            if AIM_SNAP_DELAY > 0 then
+                                task.wait(AIM_SNAP_DELAY)
+                                if not isRunning then return end
+                                local khrp2 = killer:FindFirstChild("HumanoidRootPart")
+                                local char2 = getCharacter()
+                                local hrp2  = char2 and char2:FindFirstChild("HumanoidRootPart")
+                                if khrp2 and hrp2 then
+                                    local behindPos = khrp2.CFrame.Position
+                                        - (khrp2.CFrame.LookVector.Unit * BEHIND_DISTANCE)
+                                    behindPos = Vector3.new(
+                                        behindPos.X, hrp2.Position.Y, behindPos.Z
+                                    )
+                                    hrp2.CFrame = CFrame.new(
+                                        behindPos,
+                                        behindPos + khrp2.CFrame.LookVector.Unit
+                                    )
+                                end
+                            end
+                        end)
+                    end
+                end
+            elseif DEBUG_LINE then
+                -- Out of range — remove the debug line
+                removeDebugLine()
+            end
+
+            -- "Around" mode: just proximity, no angle check
+            if rangeMode == "Around"
+            and dist <= proximity
+            and os.clock() - lastTrigger >= COOLDOWN
+            and not triggered then
+                local cdNum = readCooldownValue(getDaggerCooldown())
+                if not (cdNum and cdNum > 0.1) then
+                    lastTrigger = os.clock()
+                    triggered   = true
+                    task.spawn(function()
+                        activateForKiller(killer, DEFAULT_DURATION)
+                        if REMOTE_FIRE_DELAY > 0 then task.wait(REMOTE_FIRE_DELAY) end
+                        if daggerEnabled then tryActivateButton(getDaggerButton()) end
+                        if AIM_SNAP_DELAY > 0 then
+                            task.wait(AIM_SNAP_DELAY)
+                            if not isRunning then return end
+                            local khrp2 = killer:FindFirstChild("HumanoidRootPart")
+                            local char2 = getCharacter()
+                            local hrp2  = char2 and char2:FindFirstChild("HumanoidRootPart")
+                            if khrp2 and hrp2 then
+                                local tp = Vector3.new(khrp2.Position.X, hrp2.Position.Y, khrp2.Position.Z)
+                                hrp2.CFrame = CFrame.new(hrp2.Position, tp)
+                            end
+                        end
+                    end)
+                end
+            end
+        end
+
+        if not triggered then removeDebugLine() end
+    end
+end)
+
+----------------------------------------------------------------
+-- UI Controls
+----------------------------------------------------------------
+SettingsSection:Toggle({
+    Title    = "Auto Backstab",
+    Type     = "Checkbox",
+    Default  = false,
+    Callback = function(state) enabled = state end,
+})
+
+SettingsSection:Toggle({
+    Title    = "Auto Stab on Backstab",
+    Type     = "Checkbox",
+    Default  = false,
+    Callback = function(state) daggerEnabled = state end,
+})
+
+SettingsSection:Toggle({
+    Title    = "Debug Line",
+    Type     = "Checkbox",
+    Default  = true,
+    Callback = function(state)
+        DEBUG_LINE = state
+        if not state then removeDebugLine() end
+    end,
+})
+
+SettingsSection:Dropdown({
+    Title    = "Backstab Type",
+    Values   = {"Lerp", "Teleport", "Aim"},
+    Value    = "Lerp",
+    Callback = function(value) backstabType = value end,
+})
+
+SettingsSection:Dropdown({
+    Title    = "Range Mode",
+    Values   = {"Around", "Behind"},
+    Value    = "Behind",
+    Callback = function(value) rangeMode = value end,
+})
+
+SettingsSection:Slider({
+    Title    = "Detection Range",
+    Step     = 1,
+    Value    = { Min = 1, Max = 30, Default = DEFAULT_PROXIMITY },
+    Callback = function(value) proximity = value end,
+})
+
+SettingsSection:Slider({
+    Title    = "Behind Distance",
+    Step     = 0.5,
+    Value    = { Min = 0.5, Max = 10, Default = BEHIND_DISTANCE },
+    Callback = function(value) BEHIND_DISTANCE = value end,
+})
+
+-- Default 70° mirrors DaggerBackstabThreshold from server Config.
+SettingsSection:Slider({
+    Title    = "Behind Cone Angle (°)",
+    Step     = 5,
+    Value    = { Min = 10, Max = 180, Default = BEHIND_CONE_DEGREES },
+    Callback = function(value) BEHIND_CONE_DEGREES = value end,
+})
+
+SettingsSection:Slider({
+    Title    = "Remote Fire Delay (s)",
+    Step     = 0.01,
+    Value    = { Min = 0.00, Max = 0.50, Default = REMOTE_FIRE_DELAY },
+    Callback = function(value) REMOTE_FIRE_DELAY = value end,
+})
+
+-- Windup = 0.3s. Max slider = 0.30 so you can snap exactly at hitbox.
+SettingsSection:Slider({
+    Title    = "Aim Snap Delay (s)",
+    Step     = 0.01,
+    Value    = { Min = 0.00, Max = 0.30, Default = AIM_SNAP_DELAY },
+    Callback = function(value) AIM_SNAP_DELAY = value end,
+})
+
+----------------------------------------------------------------
+-- Interface Tab
+----------------------------------------------------------------
+local InterfaceTab = Window:Tab({
+    Title  = "Interface",
+    Icon   = "scan",
+    Locked = false,
+})
+
+InterfaceTab:Section({
+    Title  = "UI Functions",
+    Opened = true,
+})
+
+InterfaceTab:Button({
+    Title    = "Unload Script",
+    Locked   = false,
+    Callback = function()
+        isRunning = false
+        enabled   = false
+        setAutoRotate(true)
+        removeDebugLine()
+        Window:Destroy()
+    end,
+})
+
+InterfaceTab:Button({
+    Title    = "Close UI",
+    Locked   = false,
+    Callback = function()
+        Window:Destroy()
+    end,
+})
