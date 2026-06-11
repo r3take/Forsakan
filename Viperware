@@ -1607,7 +1607,7 @@ local musicTracks = {
     ["SceneSlasherLMS"]="https://files.catbox.moe/ap3x4x.mp3",["SynonymsForEternity"]="https://files.catbox.moe/uj45ih.mp3",
     ["EternityEpicfied"]="https://files.catbox.moe/yrmpvx.mp3",["EternalHopeEternalFight"]="https://files.catbox.moe/xdm5q8.mp3",
     ["ShakeysBallad"]="https://files.catbox.moe/rehnvq.mp3",["SlasherVSGuest"]="https://files.catbox.moe/kycypy.mp3",
-    ["MS4LMS"]="https://files.catbox.moe/owrw3o.mp3",["Debth"]="https://files.catbox.moe/vc1ak4.mp3",
+    ["Debth"]="https://files.catbox.moe/vc1ak4.mp3",
 }
 local musicList = {}; for k in pairs(musicTracks) do table.insert(musicList, k) end; table.sort(musicList)
 
@@ -1704,7 +1704,7 @@ local secSurvivors = tabChar:Section({ Title = "Survivors", Opened = true })
 secSurvivors:Button({ Title="Veeronica", Locked=true, Callback=function() end })
 local secSentinels = tabChar:Section({ Title = "Sentinels", Opened = true })
 secSentinels:Button({ Title="Guest1337",                        Callback=function() loadstring(game:HttpGet("https://pastebin.com/raw/Kx5U4bLL"))() end })
-secSentinels:Button({ Title="Shedletsky (just use hitbox lol)", Locked=true, Callback=function() end })
+secSentinels:Button({ Title="Shedletsky (just use autocollision lol)", Locked=true, Callback=function() end })
 secSentinels:Button({ Title="Chance",                           Callback=function() loadstring(game:HttpGet("https://pastebin.com/raw/XnXQY5VD"))() end })
 secSentinels:Button({ Title="TwoTime",                          Callback=function() loadstring(game:HttpGet("https://raw.githubusercontent.com/r3take/Forsakan/refs/heads/main/viperstab"))() end })
 secSentinels:Button({ Title="Jane Doe",                         Callback=function() loadstring(game:HttpGet("https://pastebin.com/raw/YwkMhHE2"))() end })
