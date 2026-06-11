@@ -1707,9 +1707,9 @@ secSentinels:Button({ Title="Guest1337",                        Callback=functio
 secSentinels:Button({ Title="Shedletsky (just use autocollision lol)", Locked=true, Callback=function() end })
 secSentinels:Button({ Title="Chance",                           Callback=function() loadstring(game:HttpGet("https://pastebin.com/raw/XnXQY5VD"))() end })
 secSentinels:Button({ Title="TwoTime",                          Callback=function() loadstring(game:HttpGet("https://raw.githubusercontent.com/r3take/Forsakan/refs/heads/main/viperstab"))() end })
-secSentinels:Button({ Title="Jane Doe",                         Callback=function() loadstring(game:HttpGet("https://pastebin.com/raw/YwkMhHE2"))() end })
+secSentinels:Button({ Title="Jane Doe",                         Callback=function() loadstring(game:HttpGet("https://pastebin.com/raw/bqM9aJGY"))() end })
 local secSupports  = tabChar:Section({ Title = "Supports", Opened = true })
-secSupports:Button({ Title="Dusekkar", Callback=function() loadstring(game:HttpGet("https://pastebin.com/raw/e23dzqcs"))() end })
+secSupports:Button({ Title="Dusekkar", Callback=function() loadstring(game:HttpGet("https://pastebin.com/raw/ugJKrDyw"))() end })
 secSupports:Button({ Title="Elliot",   Callback=function() loadstring(game:HttpGet("https://pastebin.com/raw/cD2nYPxE"))() end })
 
 ------------------------------------------------------------------------
