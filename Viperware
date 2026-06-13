@@ -1607,52 +1607,101 @@ local musicTracks = {
     ["SceneSlasherLMS"]="https://files.catbox.moe/ap3x4x.mp3",["SynonymsForEternity"]="https://files.catbox.moe/uj45ih.mp3",
     ["EternityEpicfied"]="https://files.catbox.moe/yrmpvx.mp3",["EternalHopeEternalFight"]="https://files.catbox.moe/xdm5q8.mp3",
     ["ShakeysBallad"]="https://files.catbox.moe/rehnvq.mp3",["SlasherVSGuest"]="https://files.catbox.moe/kycypy.mp3",
-    ["Debth"]="https://files.catbox.moe/vc1ak4.mp3",["ShatteredHopes"]="https://files.catbox.moe/wpm69c.mp3",
+    ["Debth"]="https://files.catbox.moe/0trlry.mp3",["ShatteredHopes"]="https://files.catbox.moe/wpm69c.mp3",
+    ["EmberRageLMS"]="https://files.catbox.moe/67roie.mp3",
+    ["SprunkinLMS"]="https://files.catbox.moe/sfsoi7.mp3",
+    ["AzureVSTwoTimeLMS"]="https://files.catbox.moe/qxe5ln.mp3",
 }
 local musicList = {}; for k in pairs(musicTracks) do table.insert(musicList, k) end; table.sort(musicList)
+
+------------------------------------------------------------------------
+-- Cache invalidation: each track stores a sidecar .url file.
+-- If the URL on disk doesn't match the current table entry,
+-- the stale mp3 is deleted and re-downloaded automatically.
+------------------------------------------------------------------------
+local function musicTrackPath(name)
+    return musicDir.."/"..name:gsub("[^%w]","_")..".mp3"
+end
+local function musicUrlPath(name)
+    return musicDir.."/"..name:gsub("[^%w]","_")..".url"
+end
+local function musicCacheValid(name)
+    local mp3  = musicTrackPath(name)
+    local urlf = musicUrlPath(name)
+    if not fs.hasFile(mp3) then return false end
+    if not fs.hasFile(urlf) then return false end            -- no sidecar = legacy cache, treat as stale
+    local stored = fs.read(urlf) or ""
+    return stored == (musicTracks[name] or "")
+end
+local function musicBustCache(name)
+    local mp3  = musicTrackPath(name)
+    local urlf = musicUrlPath(name)
+    if fs.hasFile(mp3)  then pcall(function() fs.write(mp3,  "") end) end
+    if fs.hasFile(urlf) then pcall(function() fs.write(urlf, "") end) end
+    music.cached[name]       = nil
+    music.loadingTracks[name] = nil
+end
+local function musicWriteSidecar(name)
+    pcall(function() fs.write(musicUrlPath(name), musicTracks[name] or "") end)
+end
+
+-- On startup, bust any tracks whose URL changed
+task.spawn(function()
+    for name in pairs(musicTracks) do
+        if not musicCacheValid(name) then
+            musicBustCache(name)
+        end
+    end
+end)
 
 local function musicFetchAsync(name, callback)
     if music.cached[name] then if callback then callback(music.cached[name]) end; return music.cached[name] end
     if music.loadingTracks[name] then return nil end
     music.loadingTracks[name] = true
-    local url=musicTracks[name]; if not url then music.loadingTracks[name]=nil; return nil end
-    local path=musicDir.."/"..name:gsub("[^%w]","_")..".mp3"
-    if fs.hasFile(path) then
-        local asset=fs.asset(path); music.cached[name]=asset; music.loadingTracks[name]=nil
+    local url = musicTracks[name]; if not url then music.loadingTracks[name]=nil; return nil end
+    local path = musicTrackPath(name)
+    if musicCacheValid(name) then
+        local asset = fs.asset(path); music.cached[name]=asset; music.loadingTracks[name]=nil
         if callback then callback(asset) end; return asset
     end
     task.spawn(function()
-        local ok,data=pcall(function() return game:HttpGet(url,true) end)
+        local ok,data = pcall(function() return game:HttpGet(url,true) end)
         if ok and data and #data>0 then
             pcall(function() fs.write(path,data) end)
-            local asset=fs.asset(path); music.cached[name]=asset
+            musicWriteSidecar(name)
+            local asset = fs.asset(path); music.cached[name]=asset
+            music.loadingTracks[name]=nil
             if callback then callback(asset) end
-        else music.loadingTracks[name]=nil end
+        else
+            music.loadingTracks[name]=nil
+        end
     end)
     return nil
 end
+
 local function musicFetch(name)
     if music.cached[name] then return music.cached[name] end
-    local url=musicTracks[name]; if not url then return nil end
-    local path=musicDir.."/"..name:gsub("[^%w]","_")..".mp3"
-    if not fs.hasFile(path) then
-        local ok,data=pcall(function() return game:HttpGet(url,true) end)
+    local url  = musicTracks[name]; if not url then return nil end
+    local path = musicTrackPath(name)
+    if not musicCacheValid(name) then
+        local ok,data = pcall(function() return game:HttpGet(url,true) end)
         if not ok or not data or #data==0 then return nil end
         pcall(function() fs.write(path,data) end)
+        musicWriteSidecar(name)
     end
-    music.cached[name]=fs.asset(path); return music.cached[name]
+    music.cached[name] = fs.asset(path); return music.cached[name]
 end
+
 local function musicGetSound()
     local now=tick()
     if music.cachedSound and music.cachedSound.Parent and (now-music.lastSoundCheck)<0.5 then return music.cachedSound end
     music.lastSoundCheck=now
-    local t=svc.WS:FindFirstChild("Themes"); if t then local s=t:FindFirstChild("LastSurvivor"); if s then music.cachedSound=s; return s end end
-    local ok,ss=pcall(function() return game:GetService("SoundService") end)
-    if ok and ss then local s=ss:FindFirstChild("LastSurvivor",true); if s then music.cachedSound=s; return s end end
-    local s=svc.WS:FindFirstChild("LastSurvivor",true); if s then music.cachedSound=s; return s end
-    s=svc.RS:FindFirstChild("LastSurvivor",true); if s then music.cachedSound=s; return s end
-    music.cachedSound=nil; return nil
+    local s = svc.WS:FindFirstChild("LastSurvivor",true)
+           or svc.RS:FindFirstChild("LastSurvivor",true)
+           or game:GetService("SoundService"):FindFirstChild("LastSurvivor",true)
+    music.cachedSound = s; return s
 end
+
 local function musicPlay(name)
     local snd=musicGetSound(); if not snd then return false end
     if not music.origId then music.origId=snd.SoundId end
@@ -1661,16 +1710,22 @@ local function musicPlay(name)
     elseif not snd.IsPlaying then snd:Play() end
     return true
 end
+
 local function musicReset()
     local snd=musicGetSound()
     if snd and music.origId then snd.SoundId=music.origId; snd:Stop(); task.wait(0.05); snd:Play() end
 end
+
 local function musicIsLMS()
     local sf=getTeamFolder("Survivors"); if not sf then return false end
     local alive=0
-    for _,s in ipairs(sf:GetChildren()) do local h=s:FindFirstChildOfClass("Humanoid"); if h and h.Health>0 then alive+=1 end; if alive>1 then return false end end
-    return alive==1
+    for _,s in ipairs(sf:GetChildren()) do
+        local h=s:FindFirstChildOfClass("Humanoid")
+        if h and h.Health>0 then alive+=1 end
+    end
+    return alive<=1 and alive>=0
 end
+
 local function musicMonitor()
     while music.on do
         local lms=musicIsLMS(); local snd=musicGetSound()
@@ -1684,14 +1739,30 @@ local function musicMonitor()
         task.wait(0.25)
     end
 end
-task.spawn(function() while true do task.wait(2); if music.on and not music.cached[music.selected] and not music.loadingTracks[music.selected] then musicFetchAsync(music.selected) end end end)
+
+task.spawn(function()
+    while true do
+        task.wait(2)
+        if music.on and not music.cached[music.selected] and not music.loadingTracks[music.selected] then
+            musicFetchAsync(music.selected)
+        end
+    end
+end)
 
 secLMS:Toggle({ Title="Auto-Play on LMS", Type="Checkbox", Default=music.on, Callback=function(on) music.on=on; cfg.set("musicOn",on); if on then musicFetchAsync(music.selected); music.thread=task.spawn(musicMonitor) else if music.thread then task.cancel(music.thread); music.thread=nil end; musicReset() end end })
 secLMS:Dropdown({ Title="Track", Values=musicList, Value=music.selected, Callback=function(sel) music.selected=type(sel)=="table" and sel[1] or sel; cfg.set("musicSel",music.selected); task.spawn(function() musicFetchAsync(music.selected) end) end })
 secLMS:Button({ Title="▶  Play",  Callback=function() musicPlay(music.selected) end })
 secLMS:Button({ Title="■  Stop",  Callback=function() musicReset() end })
 secLMS:Button({ Title="↓  Preload LMS", Callback=function() task.spawn(function() for name in pairs(musicTracks) do musicFetchAsync(name); task.wait(0.05) end end) end })
-lp.CharacterAdded:Connect(function() task.wait(1); if music.on then if music.thread then task.cancel(music.thread) end; music.thread=task.spawn(musicMonitor) end end)
+
+lp.CharacterAdded:Connect(function()
+    task.wait(1)
+    if music.on then
+        if music.thread then task.cancel(music.thread) end
+        music.thread=task.spawn(musicMonitor)
+    end
+end)
+
 if music.on then musicFetchAsync(music.selected); music.thread=task.spawn(musicMonitor) end
 
 ------------------------------------------------------------------------
