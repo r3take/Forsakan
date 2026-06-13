@@ -1603,11 +1603,11 @@ local musicTracks = {
     ["Milestone4LMS"]="https://files.catbox.moe/z68ns9.mp3",["BluududLMS"]="https://files.catbox.moe/gemz4k.mp3",
     ["JohnDoeLMS"]="https://files.catbox.moe/p72236.mp3",["ShedVS1xLMS"]="https://files.catbox.moe/0q5v9p.mp3",
     ["EternalIShallEndure"]="https://files.catbox.moe/c3ohcm.mp3",["ChanceVSMafiosoLMS"]="https://files.catbox.moe/0hlm8m.mp3",
-    ["MafiosoVsChanceLMS"]="https://files.catbox.moe/0hlm8m.mp3",["JohnVsJaneLMS"]="https://files.catbox.moe/inonzr.mp3",
+    ["MafiosoVsChanceLMS"]="https://files.catbox.moe/0hlm8m.mp3",["JohnVsJaneLMS"]="https://files.catbox.moe/jto3ib.mp3",
     ["SceneSlasherLMS"]="https://files.catbox.moe/ap3x4x.mp3",["SynonymsForEternity"]="https://files.catbox.moe/uj45ih.mp3",
     ["EternityEpicfied"]="https://files.catbox.moe/yrmpvx.mp3",["EternalHopeEternalFight"]="https://files.catbox.moe/xdm5q8.mp3",
     ["ShakeysBallad"]="https://files.catbox.moe/rehnvq.mp3",["SlasherVSGuest"]="https://files.catbox.moe/kycypy.mp3",
-    ["Debth"]="https://files.catbox.moe/vc1ak4.mp3",
+    ["Debth"]="https://files.catbox.moe/vc1ak4.mp3",["ShatteredHopes"]="https://files.catbox.moe/wpm69c.mp3",
 }
 local musicList = {}; for k in pairs(musicTracks) do table.insert(musicList, k) end; table.sort(musicList)
 
