@@ -1625,6 +1625,7 @@ local musicTracks = {
     ["MeetYourMaking"]          = ghBase.."MeetYourMaking.mp3",
     ["ReceadingLifespan"]       = ghBase.."ReceadingLifespan.mp3",
     ["PhoenixLMS"]              = ghBase.."phoenixlms.mp3",
+    ["JerseyDebth"]             = ghBase.."JerseyDebth.mp3",
 }
 local musicList = {}; for k in pairs(musicTracks) do table.insert(musicList, k) end; table.sort(musicList)
 
