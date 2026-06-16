@@ -1767,7 +1767,40 @@ local function musicReset()
 end
 
 ------------------------------------------------------------------------
--- Event-driven LMS detection
+-- Sound getter: direct path workspace.Themes.LastSurvivor
+------------------------------------------------------------------------
+local function musicGetSound()
+    local now = tick()
+    if music.cachedSound and music.cachedSound.Parent
+        and (now - music.lastSoundCheck) < 0.5 then
+        return music.cachedSound
+    end
+    music.lastSoundCheck = now
+
+    -- Primary: workspace.Themes.LastSurvivor
+    local themes = workspace:FindFirstChild("Themes")
+    if themes then
+        local snd = themes:FindFirstChild("LastSurvivor")
+        if snd and snd:IsA("Sound") then
+            music.cachedSound = snd
+            return snd
+        end
+    end
+
+    -- Fallback: deep search (slower, only if Themes isn't ready yet)
+    local snd = workspace:FindFirstChild("LastSurvivor", true)
+        or game:GetService("SoundService"):FindFirstChild("LastSurvivor", true)
+    if snd and snd:IsA("Sound") then
+        music.cachedSound = snd
+        return snd
+    end
+
+    music.cachedSound = nil
+    return nil
+end
+
+------------------------------------------------------------------------
+-- LMS alive count: no early exit so we get the real number
 ------------------------------------------------------------------------
 local function musicCountAlive(sf)
     local alive = 0
@@ -1776,85 +1809,17 @@ local function musicCountAlive(sf)
         local hrp = model:FindFirstChild("HumanoidRootPart")
         if hum and hrp and hum.Health > 0 and hum.Health == hum.Health then
             alive += 1
-            if alive > 1 then return alive end
         end
     end
     return alive
 end
 
+-- LMS = exactly 2 survivors left (the actual 1v1 duel phase)
 local function musicUpdateLMSState()
     local sf = getTeamFolder("Survivors")
     if not sf then music.lmsState = false; return end
-    music.lmsState = musicCountAlive(sf) == 1
+    music.lmsState = musicCountAlive(sf) == 2
 end
-
-local function musicBindLMSTracking()
-    if music.lmsConn then music.lmsConn:Disconnect(); music.lmsConn = nil end
-    for _, c in ipairs(music.lmsHealthConns) do c:Disconnect() end
-    music.lmsHealthConns = {}
-
-    local sf = getTeamFolder("Survivors")
-    if not sf then music.lmsState = false; return end
-
-    music.lmsConn = sf.ChildAdded:Connect(function(child)
-        task.wait(0.1)
-        local hum = child:FindFirstChildOfClass("Humanoid") or child:WaitForChild("Humanoid", 2)
-        if hum then
-            local hc = hum:GetPropertyChangedSignal("Health"):Connect(musicUpdateLMSState)
-            table.insert(music.lmsHealthConns, hc)
-        end
-        musicUpdateLMSState()
-    end)
-
-    local remConn = sf.ChildRemoved:Connect(function()
-        musicUpdateLMSState()
-    end)
-    table.insert(music.lmsHealthConns, remConn)
-
-    for _, model in ipairs(sf:GetChildren()) do
-        local hum = model:FindFirstChildOfClass("Humanoid")
-        if hum then
-            local hc = hum:GetPropertyChangedSignal("Health"):Connect(musicUpdateLMSState)
-            table.insert(music.lmsHealthConns, hc)
-        end
-    end
-
-    musicUpdateLMSState()
-end
-
-local function musicMonitor()
-    while music.on do
-        local lms = music.lmsState
-        local snd = musicGetSound()
-        if lms and snd then
-            if snd.SoundId ~= (music.cached[music.selected] or "") then
-                local asset = musicFetch(music.selected)
-                if asset then
-                    musicPlay(music.selected)
-                else
-                    musicFetchAsync(music.selected, function(a)
-                        if a and music.on and music.lmsState then musicPlay(music.selected) end
-                    end)
-                end
-            elseif not snd.IsPlaying then
-                snd:Play()
-            end
-        elseif not lms and snd and music.origId
-            and snd.SoundId == (music.cached[music.selected] or "") then
-            musicReset()
-        end
-        task.wait(0.25)
-    end
-end
-
-task.spawn(function()
-    while true do
-        task.wait(2)
-        if music.on and not music.cached[music.selected] and not music.loadingTracks[music.selected] then
-            musicFetchAsync(music.selected)
-        end
-    end
-end)
 
 ------------------------------------------------------------------------
 -- UI
