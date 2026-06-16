@@ -1605,6 +1605,7 @@ local musicTracks = {
     ["JX1DX1LMS"]               = ghBase.."JX1DX1LMS.mp3",
     ["CondemnedLMS"]            = ghBase.."CondemnedLMS.mp3",
     ["GeometryLMS"]             = ghBase.."GeometryLMS.mp3",
+    ["SixerVsNoobLMS"]          = ghBase.."SixerVsNoobLMS.mp3",
     ["Milestone4LMS"]           = ghBase.."MS4LMS.mp3",
     ["BluududLMS"]              = ghBase.."BluududLMS.mp3",
     ["JohnDoeLMS"]              = ghBase.."JohnDoeLMS.mp3",
