@@ -1821,9 +1821,56 @@ local function musicUpdateLMSState()
     music.lmsState = musicCountAlive(sf) == 2
 end
 
+local function musicMonitor()
+    while music.on do
+        musicUpdateLMSState()
+        local snd = musicGetSound()
+        if music.lmsState then
+            if snd and not snd.IsPlaying then
+                musicPlay(music.selected)
+            end
+        else
+            if snd and music.origId and snd.SoundId ~= music.origId then
+                musicReset()
+            end
+        end
+        task.wait(1)
+    end
+end
+
+local function musicBindLMSTracking()
+    if music.lmsConn then music.lmsConn:Disconnect(); music.lmsConn = nil end
+    for _, c in ipairs(music.lmsHealthConns) do if c.Connected then c:Disconnect() end end
+    music.lmsHealthConns = {}
+    local sf = getTeamFolder("Survivors"); if not sf then return end
+    musicUpdateLMSState()
+    for _, model in ipairs(sf:GetChildren()) do
+        local hum = model:FindFirstChildOfClass("Humanoid")
+        if hum then
+            local c = hum.HealthChanged:Connect(function() musicUpdateLMSState() end)
+            table.insert(music.lmsHealthConns, c)
+        end
+    end
+    music.lmsConn = sf.ChildAdded:Connect(function(child)
+        task.wait(0.2)
+        local hum = child:FindFirstChildOfClass("Humanoid")
+        if hum then
+            local c = hum.HealthChanged:Connect(function() musicUpdateLMSState() end)
+            table.insert(music.lmsHealthConns, c)
+        end
+        musicUpdateLMSState()
+    end)
+end
 ------------------------------------------------------------------------
--- UI
+-- TAB: INTERFACE
 ------------------------------------------------------------------------
+local tabInterface = win:Tab({ Title = "Interface", Icon = "scan" })
+local secUIFunctions = tabInterface:Section({ Title = "UI Functions", Opened = true })
+secUIFunctions:Button({ Title = "Close UI", Callback = function()
+    local ok = pcall(function() win:Destroy() end)
+    if not ok then pcall(function() win:Close() end) end
+end })
+
 secLMS:Toggle({ Title="Auto-Play on LMS", Type="Checkbox", Default=music.on, Callback=function(on)
     music.on = on; cfg.set("musicOn", on)
     if on then
