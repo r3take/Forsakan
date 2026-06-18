@@ -1686,10 +1686,34 @@ local function musicMonitor()
         musicUpdateLMSState()
         local snd = musicGetSound()
         if music.lmsState then
-            music.manualPlay = false  -- LMS takes over; clear manual flag
-            if snd and not snd.IsPlaying then musicPlay(music.selected) end
+            music.manualPlay = false
+            if snd then
+                -- Always enforce our track: musicPlay checks SoundId internally
+                -- and only restarts if it actually changed, so this won't spam-replay
+                local asset = music.cached[music.selected]
+                if asset then
+                    if snd.SoundId ~= asset then
+                        if not music.origId then music.origId = snd.SoundId end
+                        snd.SoundId = asset
+                        snd:Stop()
+                        task.wait(0.05)
+                        snd:Play()
+                    elseif not snd.IsPlaying then
+                        snd:Play()
+                    end
+                else
+                    -- Track not cached yet; kick off async fetch and play when ready
+                    musicFetchAsync(music.selected, function(loadedAsset)
+                        local s = musicGetSound()
+                        if s and music.lmsState then
+                            if not music.origId then music.origId = s.SoundId end
+                            s.SoundId = loadedAsset
+                            s:Stop(); task.wait(0.05); s:Play()
+                        end
+                    end)
+                end
+            end
         else
-            -- Only revert to original if the user hasn't manually started something
             if not music.manualPlay and snd and music.origId and snd.SoundId ~= music.origId then
                 musicReset()
             end
