@@ -1472,6 +1472,127 @@ lp.CharacterAdded:Connect(function()
 end)
 
 ------------------------------------------------------------------------
+-- TAB: MUSIC
+------------------------------------------------------------------------
+local tabMusic = win:Tab({ Title = "Music", Icon = "music" })
+local secLMS   = tabMusic:Section({ Title = "LMS Music", Opened = true })
+
+local music = {
+    on            = cfg.get("musicOn",  false),
+    selected      = cfg.get("musicSel", "CondemnedLMS"),
+    cached        = {},
+    origId        = nil,
+    thread        = nil,
+    lastSoundCheck= 0,
+    cachedSound   = nil,
+    loadingTracks = {},
+    lmsState      = false,
+    lmsConn       = nil,
+    lmsHealthConns= {},
+    manualPlay    = false,   -- true when user pressed Play; prevents monitor from reverting
+}
+
+local musicDir = "GlovSakenScript/LMS_Songs"
+if not fs.hasFolder("GlovSakenScript") then fs.makeFolder("GlovSakenScript") end
+if not fs.hasFolder(musicDir) then fs.makeFolder(musicDir) end
+
+local ghBase = "https://raw.githubusercontent.com/r3take/lmsstuff/main/"
+local musicTracks = {
+    ["AbberantLMS"]             = ghBase.."AbberantLMS.mp3",
+    ["OvertimeLMS"]             = ghBase.."OvertimeLMS.mp3",
+    ["PhotoshopLMS"]            = ghBase.."PhotoshopLMS.mp3",
+    ["JX1DX1LMS"]               = ghBase.."JX1DX1LMS.mp3",
+    ["CondemnedLMS"]            = ghBase.."CondemnedLMS.mp3",
+    ["GeometryLMS"]             = ghBase.."GeometryLMS.mp3",
+    ["SixerVsNoobLMS"]          = ghBase.."SixerVsNoobLMS.mp3",
+    ["Milestone4LMS"]           = ghBase.."MS4LMS.mp3",
+    ["BluududLMS"]              = ghBase.."BluududLMS.mp3",
+    ["JohnDoeLMS"]              = ghBase.."JohnDoeLMS.mp3",
+    ["EternalIShallEndure"]     = ghBase.."EternallShallEndure.mp3",
+    ["ChanceVSMafiosoLMS"]      = ghBase.."ChanceVSMafioso.mp3",
+    ["MafiosoVsChanceLMS"]      = ghBase.."ChanceVSMafioso.mp3",
+    ["JohnVsJaneLMS"]           = ghBase.."JohnVSJaneLMS.mp3",
+    ["SynonymsForEternity"]     = ghBase.."synonymsforeternity.mp3",
+    ["EternityEpicfied"]        = ghBase.."EternityEpicfied.mp3",
+    ["EternalHopeEternalFight"] = ghBase.."EternalHopeEternalFight.mp3",
+    ["SlasherVSGuest"]          = ghBase.."slashervguestlms.mp3",
+    ["Debth"]                   = ghBase.."Debth.mp3",
+    ["ShatteredHopes"]          = ghBase.."ShatteredHopesLMS.mp3",
+    ["EmberRageLMS"]            = ghBase.."emberragelms.mp3",
+    ["SprunkinLMS"]             = ghBase.."SPRUNKINLMS.mp3",
+    ["AzureVSTwoTimeLMS"]       = ghBase.."azurevstwotimelms.mp3",
+    ["AshleLMS"]                = ghBase.."Ashlelms.mp3",
+    ["MeetYourMaking"]          = ghBase.."MeetYourMaking.mp3",
+    ["ReceadingLifespan"]       = ghBase.."ReceadingLifespan.mp3",
+    ["PhoenixLMS"]              = ghBase.."phoenixlms.mp3",
+    ["JerseyDebth"]             = ghBase.."JerseyDebth.mp3",
+}
+local musicList = {}; for k in pairs(musicTracks) do table.insert(musicList, k) end; table.sort(musicList)
+
+local music = {
+    on         = cfg.get("musicOn", false),
+    selected   = cfg.get("musicSel", musicList[1]),
+    cached     = {},          -- name -> getcustomasset result
+    cachedSound = nil,
+    lastSoundCheck = 0,
+    origId     = nil,
+    manualPlay = false,
+    lmsState   = false,
+    lmsConn    = nil,
+    lmsHealthConns = {},
+    thread     = nil,
+}
+
+local MUSIC_DIR = "GlovSakenScript/Music"
+local function musicTrackPath(name) return MUSIC_DIR .. "/" .. name .. ".mp3" end
+local function musicSidecarPath(name) return MUSIC_DIR .. "/" .. name .. ".meta" end
+
+local function musicHttpGet(url)
+    local ok, data = pcall(function() return game:HttpGet(url) end)
+    if ok and data and #data > 0 then return data end
+    return nil
+end
+
+local function musicWriteSidecar(name)
+    pcall(function() fs.write(musicSidecarPath(name), tostring(os.time())) end)
+end
+
+local function musicCacheValid(name)
+    return fs.hasFile(musicTrackPath(name))
+end
+
+-- Synchronous fetch: returns a usable asset id (string) or nil
+local function musicFetch(name)
+    if music.cached[name] then return music.cached[name] end
+    local url = musicTracks[name]; if not url then return nil end
+    if not fs.hasFolder(MUSIC_DIR) then fs.makeFolder(MUSIC_DIR) end
+    local path = musicTrackPath(name)
+    if not fs.hasFile(path) then
+        local data = musicHttpGet(url)
+        if not data then return nil end
+        local ok = pcall(function() fs.write(path, data) end)
+        if not ok then return nil end
+        musicWriteSidecar(name)
+    end
+    local ok, asset = pcall(function() return fs.asset(path) end)
+    if ok and asset then music.cached[name] = asset; return asset end
+    return nil
+end
+
+-- Async wrapper so the monitor loop never blocks on HttpGet
+local musicFetchInFlight = {}
+local function musicFetchAsync(name, callback)
+    if music.cached[name] then if callback then callback(music.cached[name]) end; return end
+    if musicFetchInFlight[name] then return end
+    musicFetchInFlight[name] = true
+    task.spawn(function()
+        local asset = musicFetch(name)
+        musicFetchInFlight[name] = nil
+        if asset and callback then callback(asset) end
+    end)
+end
+
+------------------------------------------------------------------------
 -- Single authoritative sound getter (workspace.Themes.LastSurvivor)
 ------------------------------------------------------------------------
 local function musicGetSound()
