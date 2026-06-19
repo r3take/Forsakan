@@ -927,7 +927,6 @@ secABS:Toggle({ Title="Enable Anti-Backstab", Type="Checkbox", Default=abs.on, C
 secABS:Slider({ Title="Detection Range",   Step=5,  Value={Min=10,Max=120,Default=abs.range},    Callback=function(v) abs.range=v;    cfg.set("absRange",v); absResizeRings() end })
 secABS:Slider({ Title="Look Duration (s)", Step=0.1,Value={Min=0.3,Max=5.0,Default=abs.duration}, Callback=function(v) abs.duration=v; cfg.set("absDur",v)                   end })
 
-
 -- SIXER AIR STRAFE
 local sixerStrafeOn = cfg.get("sixerStrafeOn", false)
 local SIXER_BIND    = "LunawareSixerStrafe"
