@@ -927,15 +927,23 @@ secABS:Toggle({ Title="Enable Anti-Backstab", Type="Checkbox", Default=abs.on, C
 secABS:Slider({ Title="Detection Range",   Step=5,  Value={Min=10,Max=120,Default=abs.range},    Callback=function(v) abs.range=v;    cfg.set("absRange",v); absResizeRings() end })
 secABS:Slider({ Title="Look Duration (s)", Step=0.1,Value={Min=0.3,Max=5.0,Default=abs.duration}, Callback=function(v) abs.duration=v; cfg.set("absDur",v)                   end })
 
--- QTE AUTO-CLICKER SECTION
-local secQTE = tabKiller:Section({ Title = "QTE Auto-Clicker", Opened = true })
+local Players = game:GetService("Players")
+local UserInputService = game:GetService("UserInputService")
+local RunService = game:GetService("RunService")
 
-local qte = {
+local lp = Players.LocalPlayer
+local pg = lp:WaitForChild("PlayerGui")
+
+local qteSystem = {
     on = cfg.get("qteOn", false),
     totalPresses = 0,
     lastPressTime = 0,
-    qteInProgress = false,
-    pressDelay = cfg.get("qtePressDelay", 0.03),
+    qteActive = false,
+    detectionActive = false,
+    pressDelay = cfg.get("qtePressDelay", 0.05),
+    lastDetectedKey = nil,
+    debugMode = cfg.get("qteDebugMode", false),
+    frameCount = 0,
 }
 
 local KEY_MAP = {
@@ -946,120 +954,218 @@ local KEY_MAP = {
 }
 
 local DPAD_MAP = {
-    ["DPadLeft"]  = Enum.KeyCode.DPadLeft,
-    ["DPadUp"]    = Enum.KeyCode.DPadUp,
-    ["DPadDown"]  = Enum.KeyCode.DPadDown,
-    ["DPadRight"] = Enum.KeyCode.DPadRight,
+    DPadLeft = Enum.KeyCode.DPadLeft,
+    DPadUp = Enum.KeyCode.DPadUp,
+    DPadDown = Enum.KeyCode.DPadDown,
+    DPadRight = Enum.KeyCode.DPadRight,
 }
 
-local function qteExtractKeyFromPrompt(imageLabel)
-    if not imageLabel or not imageLabel.Visible then return nil end
+local function qteLog(msg)
+    if qteSystem.debugMode then
+        print("[QTE-AUTO] " .. msg)
+    end
+end
+
+-- Extract key from ImageLabel
+local function qteExtractKey(imageLabel)
+    if not imageLabel then return nil end
+    
+    -- Get text from TextLabel
     local textLabel = imageLabel:FindFirstChildOfClass("TextLabel")
     if textLabel and textLabel.Text ~= "" then
-        local text = textLabel.Text:upper()
-        if KEY_MAP[text] then return KEY_MAP[text] end
+        local char = textLabel.Text:upper():sub(1, 1)
+        if KEY_MAP[char] then
+            qteLog("Detected key: " .. char)
+            return KEY_MAP[char]
+        end
     end
-    local image = imageLabel.Image or ""
-    for dpadName, keyCode in pairs(DPAD_MAP) do
-        if image:find(dpadName) then return keyCode end
+    
+    -- Check for DPad
+    local img = imageLabel.Image or ""
+    for name, code in pairs(DPAD_MAP) do
+        if img:find(name) then
+            qteLog("Detected DPad: " .. name)
+            return code
+        end
     end
+    
     return nil
 end
 
-local function qteFindCurrentQTEKey()
-    local pg = lp:FindFirstChild("PlayerGui")
-    if not pg then return nil end
+-- Find current QTE key to press
+local function qteFindKey()
     local tempUI = pg:FindFirstChild("TemporaryUI")
     if not tempUI then return nil end
     
-    for _, gui in pairs(tempUI:GetChildren()) do
-        if gui:IsA("Frame") then
-            local pcPrompt = gui:FindFirstChild("PC")
-            if pcPrompt and pcPrompt:IsA("ImageLabel") and pcPrompt.Visible then
-                local keyCode = qteExtractKeyFromPrompt(pcPrompt)
-                if keyCode then return keyCode end
+    for _, frame in pairs(tempUI:GetChildren()) do
+        if frame:IsA("Frame") and frame:FindFirstChild("Title") then
+            qteLog("QTE Frame detected")
+            qteSystem.qteActive = true
+            
+            -- Try PC element (main prompt)
+            local pc = frame:FindFirstChild("PC")
+            if pc and pc:IsA("ImageLabel") and pc.Visible then
+                local key = qteExtractKey(pc)
+                if key then return key end
             end
-            local mobileButton = gui:FindFirstChild("ActiveButton")
-            if mobileButton and mobileButton.Visible then
-                pcall(function() mobileButton:FindFirstChildOfClass("TextButton"):FireSignal("MouseButton1Down") end)
-                return "MOBILE"
+            
+            -- Try alternative elements
+            for _, child in pairs(frame:GetChildren()) do
+                if child:IsA("ImageLabel") and child.Visible and child.Name ~= "Title" then
+                    local key = qteExtractKey(child)
+                    if key then return key end
+                end
             end
+            
+            -- Deep scan
+            for _, desc in pairs(frame:GetDescendants()) do
+                if desc:IsA("ImageLabel") and desc.Visible then
+                    local key = qteExtractKey(desc)
+                    if key then return key end
+                end
+            end
+            
+            return nil
         end
     end
+    
+    qteSystem.qteActive = false
     return nil
 end
 
-local function qtePressKey(keyCode)
-    if not keyCode or not qte.on then return end
-    local now = tick()
-    if now - qte.lastPressTime < qte.pressDelay then return end
-    qte.lastPressTime = now
+-- Press key using UserInputService
+local function qtePress(keyCode)
+    if not keyCode or not qteSystem.on then return end
     
-    svc.Input:SendKeyEvent(true, keyCode, false)
+    local now = tick()
+    if now - qteSystem.lastPressTime < qteSystem.pressDelay then return end
+    qteSystem.lastPressTime = now
+    
+    qteLog("Pressing: " .. keyCode.Name)
+    UserInputService:SendKeyEvent(true, keyCode, false)
     task.wait(0.01)
-    svc.Input:SendKeyEvent(false, keyCode, false)
-    qte.totalPresses = qte.totalPresses + 1
+    UserInputService:SendKeyEvent(false, keyCode, false)
+    
+    qteSystem.totalPresses = qteSystem.totalPresses + 1
+    qteSystem.lastDetectedKey = keyCode.Name
 end
 
-local qteCheckConnection = nil
+-- Detection loop
+local qteLoop = nil
+
 local function qteStart()
-    if qteCheckConnection then return end
-    qteCheckConnection = svc.Run.Heartbeat:Connect(function()
-        if not qte.on then qte.qteInProgress = false; return end
-        local pg = lp:FindFirstChild("PlayerGui")
-        local tempUI = pg and pg:FindFirstChild("TemporaryUI")
-        if not tempUI then qte.qteInProgress = false; return end
+    if qteLoop then return end
+    
+    qteLog("QTE system started")
+    qteLoop = RunService.RenderStepped:Connect(function()
+        if not qteSystem.on then return end
         
-        local qteFrame = nil
-        for _, child in pairs(tempUI:GetChildren()) do
-            if child:IsA("Frame") and child:FindFirstChild("Title") then
-                qteFrame = child; break
-            end
-        end
+        qteSystem.frameCount = qteSystem.frameCount + 1
         
-        if qteFrame then
-            qte.qteInProgress = true
-            local keyCode = qteFindCurrentQTEKey()
-            if keyCode and keyCode ~= "MOBILE" then
-                qtePressKey(keyCode)
-            end
-        else
-            qte.qteInProgress = false
+        local key = qteFindKey()
+        if key then
+            qtePress(key)
         end
     end)
 end
 
 local function qteStop()
-    if qteCheckConnection then
-        qteCheckConnection:Disconnect()
-        qteCheckConnection = nil
+    if qteLoop then
+        qteLoop:Disconnect()
+        qteLoop = nil
     end
-    qte.qteInProgress = false
+    qteSystem.qteActive = false
+    qteSystem.frameCount = 0
+    qteLog("QTE system stopped")
 end
 
+-- Auto-start on character spawn
 lp.CharacterAdded:Connect(function()
-    qte.totalPresses = 0
-    if qte.on then qteStart() end
+    qteSystem.totalPresses = 0
+    qteSystem.lastDetectedKey = nil
+    if qteSystem.on then qteStart() end
 end)
+
+------------------------------------------------------------------------
+-- WINDUI INTEGRATION
+------------------------------------------------------------------------
+
+-- KILLER TAB
+local tabKiller = win:Tab({ Title = "Killer", Icon = "crosshair" })
+
+-- QTE Section for Killers
+local secQTE = tabKiller:Section({ Title = "QTE Auto-Clicker (All Roles)", Opened = true })
 
 secQTE:Toggle({
     Title = "Enable QTE Auto-Clicker",
     Type = "Checkbox",
-    Default = qte.on,
+    Default = qteSystem.on,
     Callback = function(on)
-        qte.on = on
+        qteSystem.on = on
         cfg.set("qteOn", on)
-        if on then qteStart() else qteStop() end
+        if on then
+            qteStart()
+        else
+            qteStop()
+        end
+        print("[QTE] " .. (on and "ENABLED" or "DISABLED"))
     end
 })
 
 secQTE:Slider({
     Title = "Press Delay (s)",
     Step = 0.01,
-    Value = {Min = 0.01, Max = 0.1, Default = qte.pressDelay},
+    Value = {Min = 0.01, Max = 0.15, Default = qteSystem.pressDelay},
     Callback = function(v)
-        qte.pressDelay = v
+        qteSystem.pressDelay = v
         cfg.set("qtePressDelay", v)
+    end
+})
+
+secQTE:Toggle({
+    Title = "Debug Mode",
+    Type = "Checkbox",
+    Default = qteSystem.debugMode,
+    Callback = function(on)
+        qteSystem.debugMode = on
+        cfg.set("qteDebugMode", on)
+        if on then
+            print("[QTE] Debug enabled - check console for detailed logs")
+        end
+    end
+})
+
+local qteStatusLabel = secQTE:Label({
+    Title = "Status: Waiting | Presses: 0 | Last: —"
+})
+
+-- Update status every frame
+task.spawn(function()
+    while true do
+        task.wait(0.1)
+        local status = qteSystem.qteActive and "ACTIVE" or "Waiting"
+        local lastKey = qteSystem.lastDetectedKey or "—"
+        
+        pcall(function()
+            qteStatusLabel:Update({
+                Title = string.format("Status: %s | Presses: %d | Last: %s",
+                    status, qteSystem.totalPresses, lastKey)
+            })
+        end)
+    end
+end)
+
+-- Quick test button
+secQTE:Button({
+    Title = "Test Detection (check console)",
+    Callback = function()
+        qteLog("=== RUNNING MANUAL TEST ===")
+        local key = qteFindKey()
+        if key then
+            qteLog("✓ Detection working! Found key: " .. key.Name)
+        else
+            qteLog("✗ No QTE frame detected. Try during a QTE prompt.")
+        end
     end
 })
 
