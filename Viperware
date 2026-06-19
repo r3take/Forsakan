@@ -1472,151 +1472,6 @@ lp.CharacterAdded:Connect(function()
 end)
 
 ------------------------------------------------------------------------
--- TAB: MUSIC
-------------------------------------------------------------------------
-local tabMusic = win:Tab({ Title = "Music", Icon = "music" })
-local secLMS   = tabMusic:Section({ Title = "LMS Music", Opened = true })
-
-local music = {
-    on            = cfg.get("musicOn",  false),
-    selected      = cfg.get("musicSel", "CondemnedLMS"),
-    cached        = {},
-    origId        = nil,
-    thread        = nil,
-    lastSoundCheck= 0,
-    cachedSound   = nil,
-    loadingTracks = {},
-    lmsState      = false,
-    lmsConn       = nil,
-    lmsHealthConns= {},
-    manualPlay    = false,   -- true when user pressed Play; prevents monitor from reverting
-}
-
-local musicDir = "GlovSakenScript/LMS_Songs"
-if not fs.hasFolder("GlovSakenScript") then fs.makeFolder("GlovSakenScript") end
-if not fs.hasFolder(musicDir) then fs.makeFolder(musicDir) end
-
-local ghBase = "https://raw.githubusercontent.com/r3take/lmsstuff/main/"
-local musicTracks = {
-    ["AbberantLMS"]             = ghBase.."AbberantLMS.mp3",
-    ["OvertimeLMS"]             = ghBase.."OvertimeLMS.mp3",
-    ["PhotoshopLMS"]            = ghBase.."PhotoshopLMS.mp3",
-    ["JX1DX1LMS"]               = ghBase.."JX1DX1LMS.mp3",
-    ["CondemnedLMS"]            = ghBase.."CondemnedLMS.mp3",
-    ["GeometryLMS"]             = ghBase.."GeometryLMS.mp3",
-    ["SixerVsNoobLMS"]          = ghBase.."SixerVsNoobLMS.mp3",
-    ["Milestone4LMS"]           = ghBase.."MS4LMS.mp3",
-    ["BluududLMS"]              = ghBase.."BluududLMS.mp3",
-    ["JohnDoeLMS"]              = ghBase.."JohnDoeLMS.mp3",
-    ["EternalIShallEndure"]     = ghBase.."EternallShallEndure.mp3",
-    ["ChanceVSMafiosoLMS"]      = ghBase.."ChanceVSMafioso.mp3",
-    ["MafiosoVsChanceLMS"]      = ghBase.."ChanceVSMafioso.mp3",
-    ["JohnVsJaneLMS"]           = ghBase.."JohnVSJaneLMS.mp3",
-    ["SynonymsForEternity"]     = ghBase.."synonymsforeternity.mp3",
-    ["EternityEpicfied"]        = ghBase.."EternityEpicfied.mp3",
-    ["EternalHopeEternalFight"] = ghBase.."EternalHopeEternalFight.mp3",
-    ["SlasherVSGuest"]          = ghBase.."slashervguestlms.mp3",
-    ["Debth"]                   = ghBase.."Debth.mp3",
-    ["ShatteredHopes"]          = ghBase.."ShatteredHopesLMS.mp3",
-    ["EmberRageLMS"]            = ghBase.."emberragelms.mp3",
-    ["SprunkinLMS"]             = ghBase.."SPRUNKINLMS.mp3",
-    ["AzureVSTwoTimeLMS"]       = ghBase.."azurevstwotimelms.mp3",
-    ["AshleLMS"]                = ghBase.."Ashlelms.mp3",
-    ["MeetYourMaking"]          = ghBase.."MeetYourMaking.mp3",
-    ["ReceadingLifespan"]       = ghBase.."ReceadingLifespan.mp3",
-    ["PhoenixLMS"]              = ghBase.."phoenixlms.mp3",
-    ["JerseyDebth"]             = ghBase.."JerseyDebth.mp3",
-}
-local musicList = {}; for k in pairs(musicTracks) do table.insert(musicList, k) end; table.sort(musicList)
-
-------------------------------------------------------------------------
--- HTTP wrapper
-------------------------------------------------------------------------
-local function musicHttpGet(url)
-    local ok, data = pcall(function() return game:HttpGet(url, true) end)
-    if ok and data and #data > 0 then return data end
-    warn("[Music] HttpGet failed for:", url, "| err:", not ok and data or "empty")
-    if request then
-        local res
-        local rok = pcall(function()
-            res = request({ Url = url, Method = "GET", Headers = { ["User-Agent"] = "Mozilla/5.0" } })
-        end)
-        if rok and res and res.StatusCode == 200 and res.Body and #res.Body > 0 then return res.Body end
-        warn("[Music] request() also failed, status:", rok and (res and res.StatusCode or "no res") or "pcall error")
-    end
-    return nil
-end
-
-------------------------------------------------------------------------
--- Cache helpers
-------------------------------------------------------------------------
-local function musicTrackPath(name) return musicDir.."/"..name:gsub("[^%w]","_")..".mp3" end
-local function musicUrlPath(name)   return musicDir.."/"..name:gsub("[^%w]","_")..".url" end
-local function musicCacheValid(name)
-    local mp3  = musicTrackPath(name)
-    local urlf = musicUrlPath(name)
-    if not fs.hasFile(mp3)  then return false end
-    if not fs.hasFile(urlf) then return false end
-    local stored = fs.read(urlf) or ""
-    return stored == (musicTracks[name] or "")
-end
-local function musicBustCache(name)
-    local mp3  = musicTrackPath(name)
-    local urlf = musicUrlPath(name)
-    if fs.hasFile(mp3)  then pcall(function() fs.write(mp3,  "") end) end
-    if fs.hasFile(urlf) then pcall(function() fs.write(urlf, "") end) end
-    music.cached[name]        = nil
-    music.loadingTracks[name] = nil
-end
-local function musicWriteSidecar(name)
-    pcall(function() fs.write(musicUrlPath(name), musicTracks[name] or "") end)
-end
-
-task.spawn(function()
-    for name in pairs(musicTracks) do
-        if not musicCacheValid(name) then musicBustCache(name) end
-    end
-end)
-
-local function musicFetchAsync(name, callback)
-    if music.cached[name] then if callback then callback(music.cached[name]) end; return music.cached[name] end
-    if music.loadingTracks[name] then return nil end
-    music.loadingTracks[name] = true
-    local url = musicTracks[name]; if not url then music.loadingTracks[name]=nil; return nil end
-    local path = musicTrackPath(name)
-    if musicCacheValid(name) then
-        local asset = fs.asset(path); music.cached[name]=asset; music.loadingTracks[name]=nil
-        if callback then callback(asset) end; return asset
-    end
-    task.spawn(function()
-        local data = musicHttpGet(url)
-        if data and #data > 0 then
-            pcall(function() fs.write(path, data) end)
-            musicWriteSidecar(name)
-            local asset = fs.asset(path); music.cached[name]=asset
-            music.loadingTracks[name]=nil
-            if callback then callback(asset) end
-        else
-            music.loadingTracks[name]=nil
-        end
-    end)
-    return nil
-end
-
-local function musicFetch(name)
-    if music.cached[name] then return music.cached[name] end
-    local url  = musicTracks[name]; if not url then return nil end
-    local path = musicTrackPath(name)
-    if not musicCacheValid(name) then
-        local data = musicHttpGet(url)
-        if not data then return nil end
-        pcall(function() fs.write(path, data) end)
-        musicWriteSidecar(name)
-    end
-    music.cached[name] = fs.asset(path); return music.cached[name]
-end
-
-------------------------------------------------------------------------
 -- Single authoritative sound getter (workspace.Themes.LastSurvivor)
 ------------------------------------------------------------------------
 local function musicGetSound()
@@ -1660,7 +1515,8 @@ local function musicReset()
 end
 
 ------------------------------------------------------------------------
--- LMS state detection
+-- LMS state detection (kept for reference / other uses, no longer
+-- gates whether music plays)
 ------------------------------------------------------------------------
 local function musicCountAlive(sf)
     local alive = 0
@@ -1679,43 +1535,35 @@ local function musicUpdateLMSState()
 end
 
 ------------------------------------------------------------------------
--- Monitor: respects manualPlay flag so Play button isn't reverted
+-- Monitor: now always plays while the toggle is on (LMS state ignored)
 ------------------------------------------------------------------------
 local function musicMonitor()
     while music.on do
-        musicUpdateLMSState()
         local snd = musicGetSound()
-        if music.lmsState then
-            music.manualPlay = false
-            if snd then
-                -- Always enforce our track: musicPlay checks SoundId internally
-                -- and only restarts if it actually changed, so this won't spam-replay
-                local asset = music.cached[music.selected]
-                if asset then
-                    if snd.SoundId ~= asset then
-                        if not music.origId then music.origId = snd.SoundId end
-                        snd.SoundId = asset
-                        snd:Stop()
-                        task.wait(0.05)
-                        snd:Play()
-                    elseif not snd.IsPlaying then
-                        snd:Play()
-                    end
-                else
-                    -- Track not cached yet; kick off async fetch and play when ready
-                    musicFetchAsync(music.selected, function(loadedAsset)
-                        local s = musicGetSound()
-                        if s and music.lmsState then
-                            if not music.origId then music.origId = s.SoundId end
-                            s.SoundId = loadedAsset
-                            s:Stop(); task.wait(0.05); s:Play()
-                        end
-                    end)
+        if snd then
+            -- Always enforce our track: musicPlay checks SoundId internally
+            -- and only restarts if it actually changed, so this won't spam-replay
+            local asset = music.cached[music.selected]
+            if asset then
+                if snd.SoundId ~= asset then
+                    if not music.origId then music.origId = snd.SoundId end
+                    snd.SoundId = asset
+                    snd:Stop()
+                    task.wait(0.05)
+                    snd:Play()
+                elseif not snd.IsPlaying then
+                    snd:Play()
                 end
-            end
-        else
-            if not music.manualPlay and snd and music.origId and snd.SoundId ~= music.origId then
-                musicReset()
+            else
+                -- Track not cached yet; kick off async fetch and play when ready
+                musicFetchAsync(music.selected, function(loadedAsset)
+                    local s = musicGetSound()
+                    if s then
+                        if not music.origId then music.origId = s.SoundId end
+                        s.SoundId = loadedAsset
+                        s:Stop(); task.wait(0.05); s:Play()
+                    end
+                end)
             end
         end
         task.wait(1)
@@ -1753,7 +1601,6 @@ secLMS:Toggle({ Title="Auto-Play on LMS", Type="Checkbox", Default=music.on, Cal
     music.on = on; cfg.set("musicOn", on)
     if on then
         musicFetchAsync(music.selected)
-        musicBindLMSTracking()
         music.thread = task.spawn(musicMonitor)
     else
         if music.thread then task.cancel(music.thread); music.thread = nil end
@@ -1803,14 +1650,12 @@ end })
 
 lp.CharacterAdded:Connect(function()
     task.wait(1)
-    musicBindLMSTracking()
     if music.on then
         if music.thread then task.cancel(music.thread) end
         music.thread = task.spawn(musicMonitor)
     end
 end)
 
-musicBindLMSTracking()
 if music.on then musicFetchAsync(music.selected); music.thread = task.spawn(musicMonitor) end
 
 ------------------------------------------------------------------------
