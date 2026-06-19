@@ -786,9 +786,11 @@ secGenAuto:Slider({ Title = "Node Speed", Step = 0.02, Value = { Min = 0.01, Max
 secGenAuto:Slider({ Title = "Line Pause", Step = 0.10, Value = { Min = 0.00, Max = 1.00, Default = flow.lineDelay }, Callback = function(v) flow.lineDelay = v; cfg.set("flowLineDelay", v) end })
 
 ------------------------------------------------------------------------
--- TAB: KILLER
+-- TAB: KILLER (with QTE integration)
 ------------------------------------------------------------------------
 local tabKiller = win:Tab({ Title = "Killer", Icon = "crosshair" })
+
+-- AIMBOT SECTION
 local secAimbot = tabKiller:Section({ Title = "Aimbot", Opened = true })
 
 local aim = {
@@ -847,6 +849,7 @@ secAimbot:Slider({ Title="Lock Time (s)",       Step=0.1,  Value={Min=0.1, Max=3
 secAimbot:Slider({ Title="Max Distance",        Step=5,    Value={Min=5,   Max=100, Default=aim.maxDist},  Callback=function(v) aim.maxDist=v;  cfg.set("aimMaxDist",v)   end })
 secAimbot:Slider({ Title="Rotation Smoothing",  Step=0.05, Value={Min=0.05,Max=1.0, Default=aim.smooth},  Callback=function(v) aim.smooth=v;   cfg.set("aimSmooth",v)    end })
 
+-- ANTI-BACKSTAB SECTION
 local secABS = tabKiller:Section({ Title = "Anti-Backstab", Opened = true })
 local abs = { on=cfg.get("absOn",false), range=cfg.get("absRange",40), duration=cfg.get("absDur",1.5), locked=false, soundConn=nil, scanThread=nil, rings={} }
 local absTriggerSounds = { ["86710781315432"]=true, ["99820161736138"]=true }
@@ -924,7 +927,143 @@ secABS:Toggle({ Title="Enable Anti-Backstab", Type="Checkbox", Default=abs.on, C
 secABS:Slider({ Title="Detection Range",   Step=5,  Value={Min=10,Max=120,Default=abs.range},    Callback=function(v) abs.range=v;    cfg.set("absRange",v); absResizeRings() end })
 secABS:Slider({ Title="Look Duration (s)", Step=0.1,Value={Min=0.3,Max=5.0,Default=abs.duration}, Callback=function(v) abs.duration=v; cfg.set("absDur",v)                   end })
 
--- Sixer Air Strafe
+-- QTE AUTO-CLICKER SECTION
+local secQTE = tabKiller:Section({ Title = "QTE Auto-Clicker", Opened = true })
+
+local qte = {
+    on = cfg.get("qteOn", false),
+    totalPresses = 0,
+    lastPressTime = 0,
+    qteInProgress = false,
+    pressDelay = cfg.get("qtePressDelay", 0.03),
+}
+
+local KEY_MAP = {
+    W = Enum.KeyCode.W,
+    A = Enum.KeyCode.A,
+    S = Enum.KeyCode.S,
+    D = Enum.KeyCode.D,
+}
+
+local DPAD_MAP = {
+    ["DPadLeft"]  = Enum.KeyCode.DPadLeft,
+    ["DPadUp"]    = Enum.KeyCode.DPadUp,
+    ["DPadDown"]  = Enum.KeyCode.DPadDown,
+    ["DPadRight"] = Enum.KeyCode.DPadRight,
+}
+
+local function qteExtractKeyFromPrompt(imageLabel)
+    if not imageLabel or not imageLabel.Visible then return nil end
+    local textLabel = imageLabel:FindFirstChildOfClass("TextLabel")
+    if textLabel and textLabel.Text ~= "" then
+        local text = textLabel.Text:upper()
+        if KEY_MAP[text] then return KEY_MAP[text] end
+    end
+    local image = imageLabel.Image or ""
+    for dpadName, keyCode in pairs(DPAD_MAP) do
+        if image:find(dpadName) then return keyCode end
+    end
+    return nil
+end
+
+local function qteFindCurrentQTEKey()
+    local pg = lp:FindFirstChild("PlayerGui")
+    if not pg then return nil end
+    local tempUI = pg:FindFirstChild("TemporaryUI")
+    if not tempUI then return nil end
+    
+    for _, gui in pairs(tempUI:GetChildren()) do
+        if gui:IsA("Frame") then
+            local pcPrompt = gui:FindFirstChild("PC")
+            if pcPrompt and pcPrompt:IsA("ImageLabel") and pcPrompt.Visible then
+                local keyCode = qteExtractKeyFromPrompt(pcPrompt)
+                if keyCode then return keyCode end
+            end
+            local mobileButton = gui:FindFirstChild("ActiveButton")
+            if mobileButton and mobileButton.Visible then
+                pcall(function() mobileButton:FindFirstChildOfClass("TextButton"):FireSignal("MouseButton1Down") end)
+                return "MOBILE"
+            end
+        end
+    end
+    return nil
+end
+
+local function qtePressKey(keyCode)
+    if not keyCode or not qte.on then return end
+    local now = tick()
+    if now - qte.lastPressTime < qte.pressDelay then return end
+    qte.lastPressTime = now
+    
+    svc.Input:SendKeyEvent(true, keyCode, false)
+    task.wait(0.01)
+    svc.Input:SendKeyEvent(false, keyCode, false)
+    qte.totalPresses = qte.totalPresses + 1
+end
+
+local qteCheckConnection = nil
+local function qteStart()
+    if qteCheckConnection then return end
+    qteCheckConnection = svc.Run.Heartbeat:Connect(function()
+        if not qte.on then qte.qteInProgress = false; return end
+        local pg = lp:FindFirstChild("PlayerGui")
+        local tempUI = pg and pg:FindFirstChild("TemporaryUI")
+        if not tempUI then qte.qteInProgress = false; return end
+        
+        local qteFrame = nil
+        for _, child in pairs(tempUI:GetChildren()) do
+            if child:IsA("Frame") and child:FindFirstChild("Title") then
+                qteFrame = child; break
+            end
+        end
+        
+        if qteFrame then
+            qte.qteInProgress = true
+            local keyCode = qteFindCurrentQTEKey()
+            if keyCode and keyCode ~= "MOBILE" then
+                qtePressKey(keyCode)
+            end
+        else
+            qte.qteInProgress = false
+        end
+    end)
+end
+
+local function qteStop()
+    if qteCheckConnection then
+        qteCheckConnection:Disconnect()
+        qteCheckConnection = nil
+    end
+    qte.qteInProgress = false
+end
+
+lp.CharacterAdded:Connect(function()
+    qte.totalPresses = 0
+    if qte.on then qteStart() end
+end)
+
+secQTE:Toggle({
+    Title = "Enable QTE Auto-Clicker",
+    Type = "Checkbox",
+    Default = qte.on,
+    Callback = function(on)
+        qte.on = on
+        cfg.set("qteOn", on)
+        if on then qteStart() else qteStop() end
+    end
+})
+
+secQTE:Slider({
+    Title = "Press Delay (s)",
+    Step = 0.01,
+    Value = {Min = 0.01, Max = 0.1, Default = qte.pressDelay},
+    Callback = function(v)
+        qte.pressDelay = v
+        cfg.set("qtePressDelay", v)
+    end
+})
+
+-- SIXER AIR STRAFE
 local sixerStrafeOn = cfg.get("sixerStrafeOn", false)
 local SIXER_BIND    = "LunawareSixerStrafe"
 svc.Run:BindToRenderStep(SIXER_BIND, Enum.RenderPriority.Character.Value + 2, function()
@@ -947,7 +1086,7 @@ svc.Run:BindToRenderStep(SIXER_BIND, Enum.RenderPriority.Character.Value + 2, fu
     hrp.AssemblyLinearVelocity = Vector3.new(newH.X, vel.Y, newH.Z)
 end)
 
--- c00lkidd Dash Turn
+-- C00LKIDD DASH TURN
 local coolkidWSOOn = cfg.get("coolkidWSOOn", false)
 local function coolkidGetInputDir()
     local cf       = svc.WS.CurrentCamera.CFrame
@@ -978,7 +1117,7 @@ svc.Run.RenderStepped:Connect(function(dt)
     end
 end)
 
--- Noli Void Rush
+-- NOLI VOID RUSH
 local noliVoidRushOn     = cfg.get("noliVoidRushOn", false)
 local noliOverrideActive = false
 local noliOrigWalkSpeed  = nil
@@ -1013,6 +1152,7 @@ svc.Run.RenderStepped:Connect(function()
 end)
 lp.CharacterAdded:Connect(function() noliStop(); noliOrigWalkSpeed = nil end)
 
+-- KILLER ABILITIES SECTION
 local secKillerAbilities = tabKiller:Section({ Title = "Killer Abilities", Opened = true })
 secKillerAbilities:Toggle({ Title="Sixer — Air Strafe",       Type="Checkbox", Default=sixerStrafeOn, Callback=function(on) sixerStrafeOn=on; cfg.set("sixerStrafeOn",on) end })
 secKillerAbilities:Toggle({ Title="c00lkidd — Dash Turn",     Type="Checkbox", Default=coolkidWSOOn,  Callback=function(on) coolkidWSOOn=on;  cfg.set("coolkidWSOOn",on)  end })
