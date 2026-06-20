@@ -435,6 +435,7 @@ local stam = {
 }
 
 local function stamModule()
+    if not lp or not lp.Character then return nil end
     local ok, m = pcall(function() return require(svc.RS.Systems.Character.Game.Sprinting) end)
     return ok and m or nil
 end
@@ -450,12 +451,19 @@ local function stamApply()
     pcall(function()
         local m = stamModule()
         if not m then return end
-        if not m.DefaultsSet then 
-            pcall(function() m.Init() end) 
+        
+        -- Wait for initialization if needed
+        if not m.DefaultsSet and lp.Character then
+            pcall(function() m.Init() end)
+            task.wait(0.1)  -- Give it time to initialize
         end
+        
+        if not m.DefaultsSet then return end  -- Still not ready
+        
         local forceNoLoss = stam.noLoss or stamIsKiller()
         m.StaminaLoss = stam.loss
         m.StaminaGain = stam.gain
+        
         local abilityCapActive = type(m.StaminaCap) == "number" and m.StaminaCap < (m.MaxStamina or math.huge)
         if not abilityCapActive then
             m.MaxStamina = stam.max
@@ -463,10 +471,12 @@ local function stamApply()
                 m.StaminaCap = stam.max 
             end
         end
+        
         m.StaminaLossDisabled = forceNoLoss
         if m.Stamina and m.Stamina > stam.max then 
             m.Stamina = stam.current 
         end
+        
         pcall(function() 
             if m.__staminaChangedEvent then 
                 m.__staminaChangedEvent:Fire() 
@@ -530,6 +540,19 @@ secStamina:Toggle({
         end)
     end
 })
+
+lp.CharacterAdded:Connect(function()
+    task.delay(1.5, function()
+        pcall(function()
+            if stam.on then 
+                stamApply()
+                if not stam.thread then 
+                    stamStart() 
+                end 
+            end
+        end)
+    end)
+end)
 
 if stam.on then 
     stamStart() 
