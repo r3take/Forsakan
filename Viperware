@@ -2865,19 +2865,19 @@ secLMS:Button({ Title="Preload LMS", Callback=function() pcall(function() for na
 local tabChar = win:Tab({ Title = "Character", Icon = "user" })
 local secSentinels = tabChar:Section({ Title = "Sentinels", Opened = true })
 
--- secSentinels:Button({ Title="Guest1337", Callback=function() pcall(function() loadstring(game:HttpGet("https://raw.githubusercontent.com/r3take/Forsakan/refs/heads/main/Guest"))() end) end })
+secSentinels:Button({ Title="Guest1337", Callback=function() pcall(function() loadstring(game:HttpGet("https://raw.githubusercontent.com/r3take/Forsakan/refs/heads/main/Guest"))() end) end })
 
--- secSentinels:Button({ Title="Chance", Callback=function() pcall(function() loadstring(game:HttpGet("https://pastebin.com/raw/XnXQY5VD"))() end) end })
+secSentinels:Button({ Title="Chance", Callback=function() pcall(function() loadstring(game:HttpGet("https://pastebin.com/raw/XnXQY5VD"))() end) end })
 
--- secSentinels:Button({ Title="TwoTime", Callback=function() pcall(function() loadstring(game:HttpGet("https://raw.githubusercontent.com/r3take/Forsakan/refs/heads/main/viperstab"))() end) end })
+secSentinels:Button({ Title="TwoTime", Callback=function() pcall(function() loadstring(game:HttpGet("https://raw.githubusercontent.com/r3take/Forsakan/refs/heads/main/viperstab"))() end) end })
 
--- secSentinels:Button({ Title="Jane Doe", Callback=function() pcall(function() loadstring(game:HttpGet("https://raw.githubusercontent.com/bezenadduca-code/Ok/refs/heads/main/Jane%20doe"))() end) end })
+secSentinels:Button({ Title="Jane Doe", Callback=function() pcall(function() loadstring(game:HttpGet("https://raw.githubusercontent.com/bezenadduca-code/Ok/refs/heads/main/Jane%20doe"))() end) end })
 
 local secSupports = tabChar:Section({ Title = "Supports", Opened = true })
 
--- secSupports:Button({ Title="Dusekkar", Callback=function() pcall(function() loadstring(game:HttpGet("https://pastebin.com/raw/ugJKrDyw"))() end) end })
+secSupports:Button({ Title="Dusekkar", Callback=function() pcall(function() loadstring(game:HttpGet("https://pastebin.com/raw/ugJKrDyw"))() end) end })
 
--- secSupports:Button({ Title="Elliot", Callback=function() pcall(function() loadstring(game:HttpGet("https://raw.githubusercontent.com/bezenadduca-code/Noob/refs/heads/main/elliot_aimbot_windui.lua"))() end) end })
+secSupports:Button({ Title="Elliot", Callback=function() pcall(function() loadstring(game:HttpGet("https://raw.githubusercontent.com/bezenadduca-code/Noob/refs/heads/main/elliot_aimbot_windui.lua"))() end) end })
 
 local tabInterface = win:Tab({ Title = "Interface", Icon = "scan" })
 local secUIFunctions = tabInterface:Section({ Title = "UI Functions", Opened = true })
