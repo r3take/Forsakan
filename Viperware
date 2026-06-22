@@ -1759,7 +1759,7 @@ catSection:Toggle({ Title="Structures", Type="Checkbox", Flag="espStructures", D
 
 local visSection = tabESP:Section({ Title = "Visual Settings", Opened = true })
 
-visSection:Slider({ Title="Max Distance", Flag="espMaxDistance", Step=10, Value={Min=50,Max=500,Default=esp.maxDistance},
+visSection:Slider({ Title="Max Distance", Flag="espMaxDistance", Step=10, Value={Min=50,Max=10000,Default=esp.maxDistance},
     Callback=function(v) pcall(function() esp.maxDistance=v; if esp.enabled then espClearAll(); espStart() end end) end })
 
 visSection:Slider({ Title="Highlight Opacity", Flag="espTransparency", Step=0.05, Value={Min=0.1,Max=1.0,Default=esp.transparency},
