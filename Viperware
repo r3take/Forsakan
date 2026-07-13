@@ -161,7 +161,7 @@ pcall(function()
         Folder         = "v1prware",
         Size           = UDim2.fromOffset(350, 480),
         Transparent    = false,
-        Theme          = "Midnight",
+        Theme          = "Dark",
         Resizable      = false,
         SideBarWidth   = 150,
         HideSearchBar  = true,
@@ -1570,106 +1570,7 @@ lp.CharacterAdded:Connect(function() pcall(function() noliStop(); noliOrigWalkSp
 
 secKillerAbilities:Toggle({ Title="Sixer — Air Strafe",       Type="Checkbox", Flag="sixerStrafeOn", Default=sixerStrafeOn, Callback=function(on) pcall(function() sixerStrafeOn=on end) end })
 secKillerAbilities:Toggle({ Title="c00lkidd — Dash Turn",     Type="Checkbox", Flag="coolkidWSOOn",  Default=coolkidWSOOn,  Callback=function(on) pcall(function() coolkidWSOOn=on end) end })
--- ============================================================
--- NOLI SECTION
--- ============================================================
-
-local secNoli = tabKiller:Section({ Title = "Noli", Opened = true })
-
--- Void Rush Control (moved from Killer Abilities)
-secNoli:Toggle({ Title="Void Rush Control", Type="Checkbox", Flag="noliVoidRushOn", Default=noliVoidRushOn, Callback=function(on) pcall(function() noliVoidRushOn=on; if not on then noliStop() end end) end })
-
--- Nova Silent Aim
-do
-    local nova_enabled    = false
-    local nova_aimOffset  = 0.0
-    local nova_prediction = 0.12
-    local nova_oldCB      = nil
-    local nova_rf         = nil
-    local nova_motionData = {}
-
-    local function novaGetVelocity(hrp)
-        local now = tick(); local pos = hrp.Position
-        local data = nova_motionData[hrp]
-        if not data then
-            nova_motionData[hrp] = { lastPos = pos, lastTime = now, vel = Vector3.zero }
-            return Vector3.zero
-        end
-        local dt = now - data.lastTime
-        if dt > 0 then
-            data.vel      = (pos - data.lastPos) / dt
-            data.lastPos  = pos
-            data.lastTime = now
-        end
-        return data.vel
-    end
-
-    local function novaGetNearestSurvivor()
-        local char = lp.Character; if not char then return nil end
-        local myHRP = char:FindFirstChild("HumanoidRootPart"); if not myHRP then return nil end
-        local pf = svc.WS:FindFirstChild("Players")
-        local sf = pf and pf:FindFirstChild("Survivors")
-        if not sf then return nil end
-        local best, bestDist = nil, math.huge
-        for _, model in ipairs(sf:GetChildren()) do
-            if model ~= char then
-                local hrp = model:FindFirstChild("HumanoidRootPart")
-                local hum = model:FindFirstChildOfClass("Humanoid")
-                if hrp and hum and hum.Health > 0 then
-                    local d = (hrp.Position - myHRP.Position).Magnitude
-                    if d < bestDist then bestDist = d; best = hrp end
-                end
-            end
-        end
-        return best
-    end
-
-    local function novaPatch()
-        local ok, rf = pcall(function()
-            return svc.RS:WaitForChild("Modules", 10)
-                :WaitForChild("Network", 10)
-                :WaitForChild("Network", 10)
-                :WaitForChild("RemoteFunction", 10)
-        end)
-        if not ok or not rf then warn("[hutao] Noli: Shared RF not found"); return end
-        nova_rf = rf
-        rfDispatch:install(rf)
-        rfDispatch:register("nova", function(reqName, ...)
-            if reqName ~= "GetMousePosition" or not nova_enabled then return nil end
-            local hrp = novaGetNearestSurvivor()
-            if not hrp then return nil end
-            local vel = novaGetVelocity(hrp)
-            return hrp.Position + vel * nova_prediction + Vector3.new(0, nova_aimOffset, 0)
-        end)
-    end
-
-    local function novaUnpatch()
-        rfDispatch:unregister("nova")
-        nova_rf = nil; nova_oldCB = nil
-    end
-
-    task.spawn(novaPatch)
-    lp.CharacterAdded:Connect(function() nova_motionData = {} end)
-
-    secNoli:Toggle({
-        Title = "Nova Silent Aim", Default = nova_enabled, Type = "Checkbox", Flag = "novaEnabled",
-        Callback = function(on) nova_enabled = on end
-    })
-    secNoli:Slider({
-        Title = "Prediction (s)", Flag = "novaPrediction",
-        Value = { Min = 0.0, Max = 0.5, Default = nova_prediction }, Step = 0.01,
-        Callback = function(v) nova_prediction = v end
-    })
-    secNoli:Slider({
-        Title = "Aim Height Offset", Flag = "novaAimOffset",
-        Value = { Min = -5.0, Max = 5.0, Default = nova_aimOffset }, Step = 0.1,
-        Callback = function(v) nova_aimOffset = v end
-    })
-    secNoli:Button({
-        Title = "Unload Nova Hook",
-        Callback = function() nova_enabled = false; novaUnpatch() end
-    })
-end
+secKillerAbilities:Toggle({ Title="Noli — Void Rush Control", Type="Checkbox", Flag="noliVoidRushOn",Default=noliVoidRushOn,Callback=function(on) pcall(function() noliVoidRushOn=on; if not on then noliStop() end end) end })
 
 -- ============================================================
 -- NOSFERATU SECTION
@@ -1994,135 +1895,153 @@ local esp = {
     itemCacheTime = 0, structCacheTime = 0, cacheLife = 5,
 }
 
--- GENERATOR LABEL (Per-Generator Progress)
--- Structure confirmed by scanner:
---   Progress is a NumberValue CHILD, NOT an attribute.
---   No BillboardGui exists on the generator natively —
---   the ESP creates one and parents it to the generator.
-local genLabels = {}
+-- ============================================================
+-- GENERATOR LABEL SYSTEM
+-- Progress is stored as a NumberValue child named "Progress"
+-- on each Generator model under Map.Ingame.Map.
+-- Values: 0 = untouched, 25/50/75 = puzzles done, 100 = complete.
+-- ============================================================
 
--- Read the NumberValue child named "Progress" directly
+-- genLabels:  obj -> TextLabel  (the label inside the ESP billboard)
+-- genConns:   obj -> { RBXScriptConnection, ... }  (value watchers)
+-- Both are plain tables — nothing is stored on the Instance itself.
+local genLabels = {}
+local genConns  = {}
+
 local function genGetProgress(obj)
     if not obj or not obj.Parent then return 0 end
     local pv = obj:FindFirstChild("Progress")
     if pv and (pv:IsA("NumberValue") or pv:IsA("IntValue")) then
         return pv.Value
     end
+    -- Fallback: check attributes in case the game changes structure
+    local av = obj:GetAttribute("Progress") or obj:GetAttribute("Charge")
+    if type(av) == "number" then return av end
     return 0
 end
 
+local function genBuildText(progress)
+    if progress >= 100 then
+        return "Generator  ✓ DONE  (100%)", Color3.fromRGB(100, 255, 100)
+    end
+    local puzzles = math.floor(progress / 25)
+    local pct     = puzzles * 25
+    return string.format("Generator  %d/4  (%d%%)", puzzles, pct),
+           Color3.fromRGB(255, 200, 50)
+end
+
 local function genUpdateLabel(obj)
-    pcall(function()
-        if not obj or not obj.Parent then return end
+    -- Must be pcall-free in the hot path; callers wrap in pcall where needed.
+    if not obj or not obj.Parent then return end
+    local label = genLabels[obj]
+    if not label then
+        -- Attempt to recover label from the billboard espCreate left on obj
+        local bb = obj:FindFirstChildWhichIsA("BillboardGui")
+        if bb then label = bb:FindFirstChildWhichIsA("TextLabel") end
+        if label then genLabels[obj] = label else return end
+    end
+    if not label.Parent then
+        -- Billboard was destroyed (e.g. espClearAll ran); drop the reference.
+        genLabels[obj] = nil
+        return
+    end
+    local txt, col = genBuildText(genGetProgress(obj))
+    label.Text       = txt
+    label.TextColor3 = col
+    label.TextSize   = 9
+    label.TextStrokeTransparency = 0.2
+    label.Visible    = true
+end
 
-        -- Label is stored in genLabels, set by genSetupGenerator via espCreate.
-        -- If somehow missing, try to find it in the billboard the ESP created.
-        local label = genLabels[obj]
-        if not label or not label.Parent then
-            local bb = obj:FindFirstChildWhichIsA("BillboardGui")
-            if bb then
-                label = bb:FindFirstChildWhichIsA("TextLabel")
-                if label then genLabels[obj] = label end
-            end
-            if not label then return end
-        end
-
-        local progress = genGetProgress(obj)
-        local newText, newColor
-        if progress >= 100 then
-            newText  = "Generator  ✓ DONE  (100%)"
-            newColor = Color3.fromRGB(100, 255, 100)
-        else
-            local puzzles = math.floor(progress / 25)
-            local pct = puzzles * 25
-            newText  = string.format("Generator  %d/4  (%d%%)", puzzles, pct)
-            newColor = Color3.fromRGB(255, 200, 50)
-        end
-
-        -- Always write — don't skip on text equality, label may have just been created
-        label.Text       = newText
-        label.TextColor3 = newColor
-        label.TextSize   = 9
-        label.TextStrokeTransparency = 0.2
-        label.Visible    = true
-    end)
+local function genDisconnectObj(obj)
+    local conns = genConns[obj]
+    if conns then
+        for _, c in ipairs(conns) do pcall(function() c:Disconnect() end) end
+        genConns[obj] = nil
+    end
 end
 
 local function genWatchGenerator(obj)
-    pcall(function()
-        if not obj then return end
-        -- Disconnect old connections if re-watching
-        if obj._genConns then
-            for _, c in ipairs(obj._genConns) do pcall(function() c:Disconnect() end) end
-            obj._genConns = nil
-        end
-        local conns = {}
+    if not obj then return end
+    genDisconnectObj(obj)  -- clean up any stale connections first
 
-        -- The only thing that changes is the NumberValue child "Progress"
-        local pv = obj:FindFirstChild("Progress")
-        if pv and (pv:IsA("NumberValue") or pv:IsA("IntValue")) then
-            table.insert(conns, pv:GetPropertyChangedSignal("Value"):Connect(function()
-                genUpdateLabel(obj)
-            end))
-        end
+    local conns = {}
 
-        -- Safety net: if Progress child is added later
-        table.insert(conns, obj.ChildAdded:Connect(function(child)
-            if child.Name == "Progress" and (child:IsA("NumberValue") or child:IsA("IntValue")) then
-                table.insert(conns, child:GetPropertyChangedSignal("Value"):Connect(function()
-                    genUpdateLabel(obj)
-                end))
-                genUpdateLabel(obj)
-            end
+    -- Watch the Progress NumberValue if it already exists
+    local pv = obj:FindFirstChild("Progress")
+    if pv and (pv:IsA("NumberValue") or pv:IsA("IntValue")) then
+        table.insert(conns, pv:GetPropertyChangedSignal("Value"):Connect(function()
+            pcall(genUpdateLabel, obj)
         end))
+    end
 
-        obj._genConns = conns
-        genUpdateLabel(obj)
-    end)
+    -- Safety net: wire up Progress if it arrives later
+    table.insert(conns, obj.ChildAdded:Connect(function(child)
+        if (child.Name == "Progress") and (child:IsA("NumberValue") or child:IsA("IntValue")) then
+            -- Also store the new watcher inside the existing conns list
+            local newConn = child:GetPropertyChangedSignal("Value"):Connect(function()
+                pcall(genUpdateLabel, obj)
+            end)
+            table.insert(conns, newConn)
+            pcall(genUpdateLabel, obj)
+        end
+    end))
+
+    -- Attribute fallback (e.g. "Charge" attribute)
+    table.insert(conns, obj.AttributeChanged:Connect(function(attr)
+        if attr == "Progress" or attr == "Charge" then
+            pcall(genUpdateLabel, obj)
+        end
+    end))
+
+    genConns[obj] = conns
+    pcall(genUpdateLabel, obj)
 end
 
 local function genSetupGenerator(obj, label)
-    pcall(function()
-        if not obj or not label then return end
-        genLabels[obj] = label
-        -- Write initial text right now so something always shows
-        local initProgress = genGetProgress(obj)
-        local initPuzzles = math.floor(initProgress / 25)
-        local initPct = initPuzzles * 25
-        label.Text = initProgress >= 100
-            and "Generator  ✓ DONE  (100%)"
-            or string.format("Generator  %d/4  (%d%%)", initPuzzles, initPct)
-        label.TextColor3 = initProgress >= 100
-            and Color3.fromRGB(100, 255, 100)
-            or Color3.fromRGB(255, 200, 50)
-        label.TextSize = 9
-        label.TextStrokeTransparency = 0.2
-        label.Visible = true
-        local bb = label.Parent
-        if bb and bb:IsA("BillboardGui") then
-            bb.Enabled = true
-            bb.AlwaysOnTop = true
-            bb.Size = UDim2.new(0, 160, 0, 18)
-            bb.StudsOffset = Vector3.new(0, 4, 0)
-        end
-        genWatchGenerator(obj)
-    end)
+    -- Called from espCreate right after the billboard/label are created.
+    if not obj or not label then return end
+    genLabels[obj] = label
+
+    -- Size the billboard properly for our longer text
+    local bb = label.Parent
+    if bb and bb:IsA("BillboardGui") then
+        bb.Enabled      = true
+        bb.AlwaysOnTop  = true
+        bb.Size         = UDim2.new(0, 200, 0, 18)
+        bb.StudsOffset  = Vector3.new(0, 4, 0)
+        bb.MaxDistance  = esp.maxDistance
+    end
+
+    -- Write initial state immediately so the label isn't blank on first frame
+    local txt, col = genBuildText(genGetProgress(obj))
+    label.Text       = txt
+    label.TextColor3 = col
+    label.TextSize   = 9
+    label.TextStrokeTransparency = 0.2
+    label.Visible    = true
+
+    genWatchGenerator(obj)
+end
+
+local function genRemoveObj(obj)
+    -- Called when a generator leaves the workspace.
+    -- Does NOT destroy the label — espClearAll handles the billboard tree.
+    genDisconnectObj(obj)
+    genLabels[obj] = nil
 end
 
 local function genClearAll()
     pcall(function()
-        for obj, label in pairs(genLabels) do
-            if label and label.Parent then
-                label:Destroy()
-            end
-            if obj._genConns then
-                for _, conn in ipairs(obj._genConns) do
-                    pcall(function() conn:Disconnect() end)
-                end
-                obj._genConns = nil
-            end
+        -- Disconnect all watchers first
+        for obj in pairs(genConns) do
+            genDisconnectObj(obj)
         end
+        -- Clear the label table; the billboards themselves are destroyed by
+        -- espClearAll via esp.billboards, so we must NOT call label:Destroy() here
+        -- or we'd double-free an already-destroyed instance.
         genLabels = {}
+        genConns  = {}
     end)
 end
 
@@ -2262,15 +2181,7 @@ local function espCreate(obj, color, labelText, isCharacter)
                     if esp.billboards[obj] then esp.billboards[obj]:Destroy() end
                     if esp.healthConnections[obj] then esp.healthConnections[obj]:Disconnect() end
                     if esp.hlMonitorConns[obj] then esp.hlMonitorConns[obj]:Disconnect() end
-                    if genLabels[obj] then
-                        genLabels[obj] = nil
-                        if obj._genConns then
-                            for _, conn in ipairs(obj._genConns) do
-                                pcall(function() conn:Disconnect() end)
-                            end
-                            obj._genConns = nil
-                        end
-                    end
+                    genRemoveObj(obj)  -- disconnect gen watchers; billboard already destroyed above
                     esp.highlights[obj] = nil
                     esp.billboards[obj] = nil
                     esp.healthConnections[obj] = nil
@@ -2412,31 +2323,24 @@ task.wait(2)
 espSetupListeners()
 if esp.enabled then espStart() end
 
--- Generator label poller — runs every second and force-writes the correct
--- text onto every known generator label regardless of event state.
--- This is the safety net that guarantees labels always show.
+-- Generator label poller — safety net that force-refreshes every known
+-- generator label once per second in case events dropped or Progress
+-- arrived before the watcher was connected.
+-- NOTE: we index genLabels by reference each iteration so that
+-- genClearAll's table swap (genLabels = {}) is picked up immediately.
 task.spawn(function()
     while true do
         task.wait(1)
         pcall(function()
-            for obj, label in pairs(genLabels) do
+            -- Always read the module-upvalue — genClearAll replaces the table,
+            -- so we re-capture it each tick via the function's upvalue chain.
+            local snap = genLabels
+            for obj, label in pairs(snap) do
                 if obj and obj.Parent and label and label.Parent then
-                    local progress = genGetProgress(obj)
-                    local newText, newColor
-                    if progress >= 100 then
-                        newText  = "Generator  ✓ DONE  (100%)"
-                        newColor = Color3.fromRGB(100, 255, 100)
-                    else
-                        local puzzles = math.floor(progress / 25)
-                        local pct = puzzles * 25
-                        newText  = string.format("Generator  %d/4  (%d%%)", puzzles, pct)
-                        newColor = Color3.fromRGB(255, 200, 50)
-                    end
-                    label.Text       = newText
-                    label.TextColor3 = newColor
-                    label.Visible    = true
-                elseif not obj or not obj.Parent then
-                    genLabels[obj] = nil
+                    pcall(genUpdateLabel, obj)
+                elseif snap[obj] ~= nil then
+                    -- generator left the workspace; clean up quietly
+                    genRemoveObj(obj)
                 end
             end
         end)
@@ -2488,14 +2392,28 @@ visSection:Button({ Title="Refresh ESP", Callback=function() pcall(function() if
 
 visSection:Button({ Title="Refresh Generator Labels", Callback=function()
     pcall(function()
-        for obj in pairs(genLabels) do genUpdateLabel(obj) end
-        -- Also re-watch all generators in case connections dropped
+        -- Re-watch all known generators to restore any dropped connections
+        for obj in pairs(genLabels) do
+            if obj and obj.Parent then
+                genWatchGenerator(obj)
+            else
+                genRemoveObj(obj)
+            end
+        end
+        -- Also sweep the map for any generators we haven't seen yet
         local mc = espGetMapContent()
         if mc then
             for _, o in ipairs(mc:GetChildren()) do
                 if o.Name == "Generator" and o.Parent then
-                    genWatchGenerator(o)
-                    genUpdateLabel(o)
+                    if not genLabels[o] then
+                        -- Not tracked yet — let the next espScan pick it up,
+                        -- or force-create it now if ESP is running
+                        if esp.enabled and not esp.highlights[o] then
+                            espCreate(o, COLORS.Generator, "Generator", false)
+                        end
+                    else
+                        genWatchGenerator(o)
+                    end
                 end
             end
         end
@@ -2767,7 +2685,6 @@ secSentinels:Button({ Title="Guest1337", Callback=function() pcall(function() lo
 secSentinels:Button({ Title="Chance", Callback=function() pcall(function() loadstring(game:HttpGet("https://pastebin.com/raw/XnXQY5VD"))() end) end })
 secSentinels:Button({ Title="TwoTime", Callback=function() pcall(function() loadstring(game:HttpGet("https://raw.githubusercontent.com/r3take/Forsakan/refs/heads/main/viperstab"))() end) end })
 secSentinels:Button({ Title="Jane Doe", Callback=function() pcall(function() loadstring(game:HttpGet("https://raw.githubusercontent.com/bezenadduca-code/Ok/refs/heads/main/Jane%20doe"))() end) end })
-secSentinels:Button({ Title="Veeronica", Callback=function() pcall(function() loadstring(game:HttpGet("https://raw.githubusercontent.com/bezenadduca-code/V1prwareRetake/refs/heads/main/veeronica%20nigga"))() end) end })
 
 local secSupports = tabChar:Section({ Title = "Supports", Opened = true })
 secSupports:Button({ Title="Dusekkar", Callback=function() pcall(function() loadstring(game:HttpGet("https://pastebin.com/raw/ugJKrDyw"))() end) end })
