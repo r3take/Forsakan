@@ -1,3 +1,4 @@
+-- V1PRWARE - Complete Final Version
 print("v1prware loading...")
 
 local success, err = pcall(function()
@@ -127,21 +128,6 @@ pcall(function()
     })
 end)
 
-print("[v1prware] Loaded successfully")
-
-end) -- End of main pcall wrapper
-
--- ============================================================
--- ERROR HANDLING
--- ============================================================
-
-if success then
-    print("[v1prware] ✓ Loaded successfully")
-else
-    local errMsg = tostring(err)
-    warn("[v1prware] ✗ Error loading: " .. errMsg)
-    print("[v1prware] Error details: " .. errMsg)
-end
 -- ============================================================
 -- UTILITY FUNCTIONS
 -- ============================================================
@@ -352,7 +338,7 @@ secPlatform:Dropdown({ Title = "Device", Flag = "platDevice", Values = { "PC", "
 lp.CharacterAdded:Connect(function() task.delay(1, function() pcall(function() if platEnabled then platPush() end end) end) end)
 
 -- ============================================================
--- EMOTES  (Settings Tab)
+-- EMOTES (Settings Tab)
 -- ============================================================
 local secEmotes = tabSettings:Section({ Title = "Emotes", Opened = true })
 
@@ -398,21 +384,17 @@ do
         hum.WalkSpeed = 0; hum.JumpPower = 0; root.Anchored = true
         local an = Instance.new("Animation"); an.AnimationId = tostring(data.AssetID)
         emState.track = anim:LoadAnimation(an); emState.track.Looped = true; emState.track:Play()
-        -- Shiftlock camera follow
         if emState.rotConn then emState.rotConn:Disconnect() end
         emState.rotConn = svc.Run.RenderStepped:Connect(function()
             if not emState.emoting then return end
-            -- Only rotate to match camera when shiftlock is on
             local cam = workspace.CurrentCamera; if not cam then return end
             if cam.CameraType ~= Enum.CameraType.Custom then return end
             local ch2 = lp.Character; if not ch2 then return end
             local r2  = ch2:FindFirstChild("HumanoidRootPart"); if not r2 then return end
-            -- CameraMode LockFirstPerson = shiftlock
             if lp.CameraMode ~= Enum.CameraMode.LockFirstPerson then return end
             local _, camY, _ = cam.CFrame:ToEulerAnglesYXZ()
             r2.CFrame = CFrame.new(r2.Position) * CFrame.Angles(0, camY, 0)
         end)
-        -- Sound on HumanoidRootPart only
         if data.SFX then
             local old2 = root:FindFirstChild("EmoteSound"); if old2 then old2:Destroy() end
             local snd = Instance.new("Sound"); snd.Name = "EmoteSound"
@@ -421,13 +403,11 @@ do
             snd.RollOffMaxDistance = 60; snd.RollOffMinDistance = 10
             snd.Parent = root; snd:Play()
         end
-        -- Particle effect
         local att = Instance.new("Attachment"); att.Name = "RootAttachment"; att.Parent = root
         local burst = Instance.new("ParticleEmitter"); burst.Name = "EmoteBurst"
         burst.Texture = "rbxassetid://635533604"; burst.Rate = 60
         burst.Speed = NumberRange.new(2,5); burst.Lifetime = NumberRange.new(0.5,1.2)
         burst.Drag = 5; burst.Parent = att
-        -- Hakari VFX
         if string.lower(mod.Name) == "hakaridance" or string.lower(mod.Name) == "hakari" then
             local beamVFX = mod:FindFirstChild("HakariBeamEffect")
             if beamVFX then
@@ -451,11 +431,9 @@ do
         emState.sg = SG2
         local function rnd2(i,r) local c=Instance.new("UICorner"); c.CornerRadius=UDim.new(0,r or 8); c.Parent=i end
         local function tw2(o,t,p) svc.TS:Create(o,TweenInfo.new(t,Enum.EasingStyle.Quad,Enum.EasingDirection.Out),p):Play() end
-        -- Toggle button (draggable)
         local Tog2=Instance.new("TextButton"); Tog2.Size=UDim2.new(0,50,0,50); Tog2.Position=UDim2.new(1,-70,1,-70)
         Tog2.Text="🎵"; Tog2.TextSize=24; Tog2.BackgroundColor3=Color3.fromRGB(30,30,40)
         Tog2.AutoButtonColor=false; Tog2.BorderSizePixel=0; Tog2.ZIndex=20; Tog2.Parent=SG2; rnd2(Tog2,25)
-        -- Drag state for the button itself
         local togDragging=false; local togDragStart; local togStartPos; local togMoved=false
         Tog2.InputBegan:Connect(function(inp)
             if inp.UserInputType==Enum.UserInputType.MouseButton1 or inp.UserInputType==Enum.UserInputType.Touch then
@@ -473,12 +451,10 @@ do
                 Tog2.Position=UDim2.new(togStartPos.X.Scale,togStartPos.X.Offset+d.X,togStartPos.Y.Scale,togStartPos.Y.Offset+d.Y)
             end
         end)
-        -- Panel
         local PW,PH=220,340
         local Panel2=Instance.new("Frame"); Panel2.Size=UDim2.new(0,PW,0,PH)
         Panel2.Position=UDim2.new(0.5,-PW/2,0.5,-PH/2); Panel2.BackgroundColor3=Color3.fromRGB(16,16,22)
         Panel2.BorderSizePixel=0; Panel2.ClipsDescendants=true; Panel2.Visible=false; Panel2.ZIndex=15; Panel2.Parent=SG2; rnd2(Panel2,10)
-        -- Draggable
         local drag2,dInp2,dSt2,sSt2
         Panel2.InputBegan:Connect(function(inp)
             if inp.UserInputType==Enum.UserInputType.MouseButton1 or inp.UserInputType==Enum.UserInputType.Touch then
@@ -495,7 +471,6 @@ do
                 Panel2.Position=UDim2.new(sSt2.X.Scale,sSt2.X.Offset+d.X,sSt2.Y.Scale,sSt2.Y.Offset+d.Y)
             end
         end)
-        -- Accent, header
         local Ac2=Instance.new("Frame"); Ac2.Size=UDim2.new(1,0,0,2); Ac2.BackgroundColor3=Color3.fromRGB(80,140,255); Ac2.BorderSizePixel=0; Ac2.Parent=Panel2
         local Hdr2=Instance.new("Frame"); Hdr2.Size=UDim2.new(1,0,0,34); Hdr2.Position=UDim2.new(0,0,0,2); Hdr2.BackgroundTransparency=1; Hdr2.Parent=Panel2
         local HTit2=Instance.new("TextLabel"); HTit2.Size=UDim2.new(1,-36,1,0); HTit2.Position=UDim2.new(0,10,0,0)
@@ -506,14 +481,12 @@ do
         CX2.Text="✕"; CX2.TextSize=12; CX2.Font=Enum.Font.GothamBold
         CX2.TextColor3=Color3.fromRGB(140,140,160); CX2.BackgroundColor3=Color3.fromRGB(30,30,42)
         CX2.AutoButtonColor=false; CX2.BorderSizePixel=0; CX2.Parent=Hdr2; rnd2(CX2,6)
-        -- Search
         local Srch2=Instance.new("TextBox"); Srch2.Size=UDim2.new(1,-12,0,28); Srch2.Position=UDim2.new(0,6,0,38)
         Srch2.PlaceholderText="Search..."; Srch2.Text=""
         Srch2.TextColor3=Color3.fromRGB(210,210,225); Srch2.PlaceholderColor3=Color3.fromRGB(90,90,110)
         Srch2.TextSize=12; Srch2.Font=Enum.Font.Gotham; Srch2.BackgroundColor3=Color3.fromRGB(24,24,34)
         Srch2.BorderSizePixel=0; Srch2.ClearTextOnFocus=false; Srch2.Parent=Panel2; rnd2(Srch2,6)
         do local p=Instance.new("UIPadding"); p.PaddingLeft=UDim.new(0,8); p.PaddingRight=UDim.new(0,8); p.Parent=Srch2 end
-        -- Scroll
         local Scrl2=Instance.new("ScrollingFrame"); Scrl2.Size=UDim2.new(1,-8,1,-106); Scrl2.Position=UDim2.new(0,4,0,72)
         Scrl2.BackgroundTransparency=1; Scrl2.BorderSizePixel=0; Scrl2.CanvasSize=UDim2.new(0,0,0,0)
         Scrl2.ScrollBarThickness=3; Scrl2.ScrollBarImageColor3=Color3.fromRGB(80,140,255)
@@ -522,7 +495,6 @@ do
         LL3:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
             Scrl2.CanvasSize=UDim2.new(0,0,0,LL3.AbsoluteContentSize.Y+6)
         end)
-        -- Stop btn
         local Dv2=Instance.new("Frame"); Dv2.Size=UDim2.new(1,0,0,1); Dv2.Position=UDim2.new(0,0,1,-37)
         Dv2.BackgroundColor3=Color3.fromRGB(36,36,50); Dv2.BorderSizePixel=0; Dv2.Parent=Panel2
         local Stp2=Instance.new("TextButton"); Stp2.Size=UDim2.new(1,0,0,36); Stp2.Position=UDim2.new(0,0,1,-36)
@@ -532,7 +504,6 @@ do
         Stp2.MouseEnter:Connect(function() tw2(Stp2,0.1,{BackgroundColor3=Color3.fromRGB(40,16,16)}) end)
         Stp2.MouseLeave:Connect(function() tw2(Stp2,0.1,{BackgroundColor3=Color3.fromRGB(22,14,14)}) end)
         Stp2.MouseButton1Click:Connect(function() emStop() end)
-        -- Rows
         local rows2={}
         local function refreshList2(q)
             for _,r in ipairs(rows2) do pcall(function() r:Destroy() end) end; rows2={}
@@ -551,8 +522,8 @@ do
                     row.BackgroundColor3=Color3.fromRGB(22,22,32); row.BackgroundTransparency=0
                     row.AutoButtonColor=false; row.BorderSizePixel=0; row.LayoutOrder=n; row.Parent=Scrl2; rnd2(row,4)
                     do local p=Instance.new("UIPadding"); p.PaddingLeft=UDim.new(0,8); p.Parent=row end
-                    row.MouseEnter:Connect(function()     tw2(row,0.08,{BackgroundColor3=Color3.fromRGB(38,38,56)}) end)
-                    row.MouseLeave:Connect(function()     tw2(row,0.08,{BackgroundColor3=Color3.fromRGB(22,22,32)}) end)
+                    row.MouseEnter:Connect(function() tw2(row,0.08,{BackgroundColor3=Color3.fromRGB(38,38,56)}) end)
+                    row.MouseLeave:Connect(function() tw2(row,0.08,{BackgroundColor3=Color3.fromRGB(22,22,32)}) end)
                     row.MouseButton1Down:Connect(function() tw2(row,0.05,{BackgroundColor3=Color3.fromRGB(50,80,160)}) end)
                     row.MouseButton1Click:Connect(function() emPlay(ch) end)
                     table.insert(rows2,row)
@@ -566,7 +537,6 @@ do
             end
         end
         Srch2:GetPropertyChangedSignal("Text"):Connect(function() refreshList2(Srch2.Text) end)
-        -- Open/close
         local pOpen2=false
         local function setPanel2(open)
             pOpen2=open; Tog2.Text=open and "✕" or "🎵"; Panel2.Visible=open
@@ -593,12 +563,12 @@ do
     lp.CharacterRemoving:Connect(function() if emState.emoting then emStop() end end)
 end
 
+end -- tabSettings
 
 -- ============================================================
 -- GLOBAL TAB
 -- ============================================================
 
-end -- tabSettings
 do -- tabGlobal
 local tabGlobal  = win:Tab({ Title = "Global", Icon = "globe" })
 
@@ -1235,85 +1205,6 @@ end -- tabGen
 do -- tabKiller
 local tabKiller = win:Tab({ Title = "Killer", Icon = "crosshair" })
 
--- Aimbot
-local secAimbot = tabKiller:Section({ Title = "Aimbot", Opened = true })
-
-local aim = {
-    on=false, cooldown=0.3, lockTime=0.4,
-    maxDist=30, smooth=0.35,
-    targeting=false, target=nil, deathConn=nil, autoRotate=nil, lastFired=0,
-    hum=nil, hrp=nil, cache={}, cacheTime=0, cacheLife=0.5,
-}
-
-local function aimAmIKiller() local ch=lp.Character; if not ch then return false end; local kf=getTeamFolder("Killers"); return kf and ch:IsDescendantOf(kf) end
-
-local function aimRefreshChar(ch) pcall(function() aim.hum=ch:FindFirstChildOfClass("Humanoid"); aim.hrp=ch:FindFirstChild("HumanoidRootPart") end) end
-
-local function aimRefreshTargets()
-    pcall(function()
-        local now=tick(); if now-aim.cacheTime<aim.cacheLife then return end; aim.cacheTime=now; aim.cache={}
-        local sf=getTeamFolder("Survivors"); if not sf then return end
-        for _,model in ipairs(sf:GetChildren()) do if model~=lp.Character and model:IsA("Model") then local h=model:FindFirstChildOfClass("Humanoid"); local r=model:FindFirstChild("HumanoidRootPart"); if h and r and h.Health>0 then table.insert(aim.cache,r) end end end
-    end)
-end
-
-local function aimNearest()
-    aimRefreshTargets(); if not aim.hrp or #aim.cache==0 then return nil end
-    local best,bd=nil,math.huge; for _,r in ipairs(aim.cache) do local d=(r.Position-aim.hrp.Position).Magnitude; if d<bd and d<=aim.maxDist then bd=d; best=r end end; return best
-end
-
-local function aimUnlock()
-    pcall(function()
-        if not aim.targeting then return end
-        if aim.deathConn then aim.deathConn:Disconnect(); aim.deathConn=nil end
-        if aim.autoRotate~=nil and aim.hum and aim.hum.Parent then pcall(function() aim.hum.AutoRotate=aim.autoRotate end) end
-        aim.targeting=false; aim.target=nil
-    end)
-end
-
-local function aimLock(r)
-    pcall(function()
-        if not r or not r.Parent or not aim.hum or not aim.hrp then return end
-        if aim.targeting and aim.target==r then return end
-        aimUnlock(); aim.target=r; aim.targeting=true; aim.autoRotate=aim.hum.AutoRotate; aim.hum.AutoRotate=false
-        local th=r.Parent:FindFirstChildOfClass("Humanoid"); if th then aim.deathConn=th.Died:Connect(aimUnlock) end
-        task.delay(aim.lockTime, function() if aim.target==r then aimUnlock() end end)
-    end)
-end
-
-svc.Run.RenderStepped:Connect(function()
-    pcall(function()
-        if not aim.on or not aim.targeting or not aim.hrp or not aim.target then return end
-        if not aim.target.Parent then aimUnlock(); return end
-        local th=aim.target.Parent:FindFirstChildOfClass("Humanoid"); if not th or th.Health<=0 then aimUnlock(); return end
-        local flat=Vector3.new(aim.target.Position.X-aim.hrp.Position.X,0,aim.target.Position.Z-aim.hrp.Position.Z).Unit
-        if flat.Magnitude>0 then aim.hrp.CFrame=aim.hrp.CFrame:Lerp(CFrame.new(aim.hrp.Position,aim.hrp.Position+flat),aim.smooth) end
-    end)
-end)
-
-task.spawn(function()
-    pcall(function()
-        local remote = hbGetRemote()
-        if not remote then warn("[v1prware] Aimbot: could not find RemoteEvent — aimbot trigger disabled"); return end
-        remote.OnClientEvent:Connect(function(...)
-            if not aim.on then return end
-            local a={...}; if typeof(a[1])~="string" then return end; local n=a[1]
-            if not (n:match("Ability") or n:match("[QER]") or n=="Slash" or n=="Dagger" or n=="Charge") then return end
-            if tick()-aim.lastFired<aim.cooldown then return end; aim.lastFired=tick()
-            if aimAmIKiller() then local t=aimNearest(); if t then aimLock(t) end end
-        end)
-    end)
-end)
-
-lp.CharacterAdded:Connect(function(ch) task.wait(0.5); aimRefreshChar(ch) end)
-if lp.Character then aimRefreshChar(lp.Character) end
-
-secAimbot:Toggle({ Title="Enable Aimbot",      Type="Checkbox", Flag="aimOn",       Default=aim.on,       Callback=function(on) pcall(function() aim.on=on; if not on then aimUnlock() end end) end })
-secAimbot:Slider({ Title="Cooldown (s)",        Flag="aimCooldown", Step=0.05, Value={Min=0.1, Max=2.0, Default=aim.cooldown}, Callback=function(v) pcall(function() aim.cooldown=v end) end })
-secAimbot:Slider({ Title="Lock Time (s)",       Flag="aimLockTime", Step=0.1,  Value={Min=0.1, Max=3.0, Default=aim.lockTime}, Callback=function(v) pcall(function() aim.lockTime=v end) end })
-secAimbot:Slider({ Title="Max Distance",        Flag="aimMaxDist", Step=5,    Value={Min=5,   Max=100, Default=aim.maxDist},  Callback=function(v) pcall(function() aim.maxDist=v end) end })
-secAimbot:Slider({ Title="Rotation Smoothing",  Flag="aimSmooth", Step=0.05, Value={Min=0.05,Max=1.0, Default=aim.smooth},  Callback=function(v) pcall(function() aim.smooth=v end) end })
-
 -- Anti-Backstab
 local secABS = tabKiller:Section({ Title = "Anti-Backstab", Opened = true })
 
@@ -1464,7 +1355,7 @@ local function coolkidGetInputDir()
     return Vector3.new(0, 0, -1)
 end
 
-svc.Run.RenderStepped:Connect(function(dt)
+svc.Run.RenderStepped:Connect(function()
     pcall(function()
         if not coolkidWSOOn then return end
         local char = lp.Character
@@ -1476,7 +1367,7 @@ svc.Run.RenderStepped:Connect(function(dt)
         if lv then lv.LineDirection = dir end
         if dir.Magnitude > 0.01 then
             local targetRot = CFrame.new(hrp.Position, hrp.Position + dir).Rotation
-            hrp.CFrame = CFrame.new(hrp.Position) * hrp.CFrame.Rotation:Lerp(targetRot, math.min(dt * 16, 1))
+            hrp.CFrame = CFrame.new(hrp.Position) * hrp.CFrame.Rotation:Lerp(targetRot, math.min(1 * 16, 1))
         end
     end)
 end)
@@ -1529,123 +1420,7 @@ secKillerAbilities:Toggle({ Title="Sixer — Air Strafe",       Type="Checkbox",
 secKillerAbilities:Toggle({ Title="c00lkidd — Dash Turn",     Type="Checkbox", Flag="coolkidWSOOn",  Default=coolkidWSOOn,  Callback=function(on) pcall(function() coolkidWSOOn=on end) end })
 secKillerAbilities:Toggle({ Title="Noli — Void Rush Control", Type="Checkbox", Flag="noliVoidRushOn",Default=noliVoidRushOn,Callback=function(on) pcall(function() noliVoidRushOn=on; if not on then noliStop() end end) end })
 
--- ============================================================
--- NOSFERATU SECTION
--- ============================================================
-
-local secNosferatu = tabKiller:Section({ Title = "Nosferatu", Opened = true })
-
--- AUTO QTE
-local qte = {
-    on = false,
-    speed = 0.03,
-}
-
-local qteThread = nil
-
-local function qteGetButton()
-    local pg = lp:FindFirstChild("PlayerGui")
-    if not pg then return nil end
-    
-    local tu = pg:FindFirstChild("TemporaryUI")
-    if not tu then return nil end
-    
-    local qteUI = tu:FindFirstChild("QTE")
-    if not qteUI then return nil end
-    
-    for _, child in ipairs(qteUI:GetDescendants()) do
-        if child.Name == "ActiveButton" and (child:IsA("TextButton") or child:IsA("ImageButton")) then
-            return child
-        end
-    end
-    
-    for _, child in ipairs(qteUI:GetDescendants()) do
-        if (child:IsA("TextButton") or child:IsA("ImageButton")) and child.Visible then
-            return child
-        end
-    end
-    
-    return nil
-end
-
-local function qtePressButton(btn)
-    if not btn then return false end
-    
-    pcall(function()
-        btn.MouseButton1Click:Fire()
-        btn.MouseButton1Down:Fire()
-        btn.MouseButton1Up:Fire()
-        btn.Activated:Fire()
-        
-        if getconnections then
-            for _, conn in ipairs(getconnections(btn.MouseButton1Down)) do
-                if conn.Function then conn.Function() end
-            end
-            for _, conn in ipairs(getconnections(btn.MouseButton1Click)) do
-                if conn.Function then conn.Function() end
-            end
-        end
-    end)
-    
-    return true
-end
-
-local function qteStart()
-    if qteThread then return end
-    qteThread = task.spawn(function()
-        while qte.on do
-            pcall(function()
-                local btn = qteGetButton()
-                if btn then
-                    qtePressButton(btn)
-                    task.wait(qte.speed)
-                else
-                    task.wait(0.05)
-                end
-            end)
-        end
-        qteThread = nil
-    end)
-end
-
-local function qteStop()
-    qte.on = false
-    if qteThread then 
-        task.cancel(qteThread)
-        qteThread = nil 
-    end
-end
-
-secNosferatu:Toggle({ 
-    Title = "Auto QTE", 
-    Type = "Checkbox", 
-    Flag = "qteOn", 
-    Default = qte.on,
-    Callback = function(on) 
-        pcall(function() 
-            qte.on = on
-            if on then 
-                qteStart() 
-            else 
-                qteStop() 
-            end 
-        end) 
-    end 
-})
-
-secNosferatu:Slider({ 
-    Title = "Click Speed (s)", 
-    Flag = "qteSpeed", 
-    Step = 0.005,
-    Value = { Min = 0.005, Max = 0.2, Default = qte.speed },
-    Callback = function(v) 
-        pcall(function() 
-            qte.speed = v 
-        end) 
-    end 
-})
-
--- BATS AIM ASSIST (Character Snap Method)
+-- Bats Aim Assist
 local batsAim = {
     on = false,
     maxDist = 100,
@@ -1832,11 +1607,95 @@ secBatsAim:Slider({
         end)
     end})
 
+-- Azure Detection
+local secAzure = tabKiller:Section({ Title = "Azure Detection", Opened = true })
+
+local azure = {
+    on = false,
+    detected = false,
+    scanThread = nil,
+}
+
+local function azureDetectFromMap()
+    local mc = getMapContent()
+    if not mc then return false end
+    
+    local bulbFolder = mc:FindFirstChild("GroundBulbModel")
+    local vineFolder = mc:FindFirstChild("VineModel")
+    
+    if bulbFolder and #bulbFolder:GetChildren() > 0 then return true end
+    if vineFolder and #vineFolder:GetChildren() > 0 then return true end
+    
+    return false
+end
+
+local function azureDetectFromKiller()
+    local kf = getTeamFolder("Killers")
+    if not kf then return false end
+    
+    for _, model in ipairs(kf:GetChildren()) do
+        if model:IsA("Model") then
+            local name = model.Name:lower()
+            if name:match("azure") then return true end
+        end
+    end
+    
+    return false
+end
+
+local function azureStart()
+    if azure.scanThread then return end
+    azure.scanThread = task.spawn(function()
+        while azure.on do
+            pcall(function()
+                local isAzure = azureDetectFromMap() or azureDetectFromKiller()
+                azure.detected = isAzure
+            end)
+            task.wait(1)
+        end
+        azure.scanThread = nil
+    end)
+end
+
+local function azureStop()
+    azure.on = false
+    if azure.scanThread then task.cancel(azure.scanThread); azure.scanThread = nil end
+end
+
+secAzure:Toggle({
+    Title = "Enable Detection",
+    Type = "Checkbox",
+    Flag = "azureDetectOn",
+    Default = azure.on,
+    Callback = function(on)
+        pcall(function()
+            azure.on = on
+            if on then azureStart() else azureStop() end
+        end)
+    end
+})
+
+secAzure:Toggle({
+    Title = "Azure Detected",
+    Type = "Checkbox",
+    Flag = "azureDetected",
+    Default = false,
+    Callback = function() end
+})
+
+lp.CharacterAdded:Connect(function()
+    pcall(function()
+        azure.detected = false
+        if azure.on then azureStart() end
+    end)
+end)
+
+end -- tabKiller
+
 -- ============================================================
 -- ESP TAB (COMPLETE)
 -- ============================================================
 
-end -- tabKiller
 do -- tabESP
 local tabESP = win:Tab({ Title = "ESP", Icon = "eye" })
 
@@ -1849,14 +1708,12 @@ local esp = {
     showItems = true, showStructures = true,
     maxDistance = 200, transparency = 0.5,
     scanRate = 1.0,
-    -- cached item/structure lists so we don't GetDescendants every tick
     cachedItems = {}, cachedStructures = {},
     itemCacheTime = 0, structCacheTime = 0, cacheLife = 5,
 }
 
 -- ============================================================
 -- GENERATOR LABEL SYSTEM
--- genLabels: obj -> TextLabel   genConns: obj -> {connections}
 -- ============================================================
 local genLabels = {}
 local genConns  = {}
@@ -2052,7 +1909,6 @@ local function espCreate(obj, color, labelText, isCharacter)
             end
         end)
 
-        -- Generator label setup
         if labelText == "Generator" or (not isCharacter and obj.Name == "Generator") then
             genSetupGenerator(obj, label)
         end
@@ -2231,7 +2087,6 @@ task.wait(2)
 espSetupListeners()
 if esp.enabled then espStart() end
 
--- Generator label poller — safety net, refreshes all labels every second.
 task.spawn(function()
     while true do
         task.wait(1)
@@ -2493,7 +2348,6 @@ local function scanC00lkiddMinions()
         skins = skins:FindFirstChild("c00lkidd")
         if not skins then return end
         
-        -- Mafiaso C00l Minions
         if mset.mafiaso then
             local mafiaso = skins:FindFirstChild("MafiosoC00l")
             if mafiaso then
@@ -2511,7 +2365,6 @@ local function scanC00lkiddMinions()
             end
         end
         
-        -- Gourd C00l Minions
         if mset.gourd then
             local gourd = skins:FindFirstChild("GourdC00l")
             if gourd then
@@ -2529,7 +2382,6 @@ local function scanC00lkiddMinions()
             end
         end
         
-        -- Cupcakes C00l Minions
         if mset.cupcakes then
             local cupcakes = skins:FindFirstChild("CupcakesC00l")
             if cupcakes then
@@ -2561,8 +2413,6 @@ task.spawn(function()
     end 
 end)
 
--- ABILITY ESP UI
--- C00lkidd Minions Section
 local c00lkiddSection = tabESP:Section({ Title = "c00lkidd Minions", Opened = true })
 
 c00lkiddSection:Toggle({ Title="Mafiaso Minions", Type="Checkbox", Flag="espMafiaso", Default=mset.mafiaso, 
@@ -2577,7 +2427,6 @@ c00lkiddSection:Toggle({ Title="Cupcakes Minions", Type="Checkbox", Flag="espCup
 c00lkiddSection:Slider({ Title="Minion Transparency", Flag="espC00lkiddTrans", Step=0.05, Value={Min=0,Max=1,Default=mset.c00lkiddTransparency}, 
     Callback=function(v) pcall(function() mset.c00lkiddTransparency=v; updateTransparency() end) end })
 
--- Other Abilities Section
 local abilitySection = tabESP:Section({ Title = "Other Abilities", Opened = true })
 
 abilitySection:Toggle({ Title="Pizza Delivery Bots", Type="Checkbox", Flag="espPizza", Default=mset.pizza, Callback=function(on) pcall(function() mset.pizza=on; if on then scanPizza() else clearTag("pizza") end end) end })
@@ -2613,7 +2462,6 @@ end -- tabESP
 -- MUSIC TAB
 -- ============================================================
 
-end -- tabESP
 do -- tabMusic
 local tabMusic = win:Tab({ Title = "Music", Icon = "music" })
 local secLMS   = tabMusic:Section({ Title = "LMS Music", Opened = true })
@@ -2753,11 +2601,12 @@ secLMS:Button({ Title="Stop", Callback=function() pcall(function() musicReset() 
 
 secLMS:Button({ Title="Preload LMS", Callback=function() pcall(function() for name in pairs(musicTracks) do musicFetchAsync(name); task.wait(0.05) end end) end })
 
+end -- tabMusic
+
 -- ============================================================
 -- CHARACTER TAB
 -- ============================================================
 
-end -- tabMusic
 do
 local tabChar = win:Tab({ Title = "Character", Icon = "user" })
 local secSentinels = tabChar:Section({ Title = "Sentinels", Opened = true })
@@ -2784,186 +2633,18 @@ secUIFunctions:Button({ Title = "Close UI", Callback = function()
     end)
 end })
 
--- CONFIG SHARE
-local secConfigShare = tabInterface:Section({ Title = "Config Share", Opened = true })
-
-local B64CHARS = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/"
-
-local function b64Encode(str)
-    local result = {}
-    local bytes = {string.byte(str, 1, #str)}
-    for i = 1, #bytes, 3 do
-        local b1,b2,b3 = bytes[i] or 0, bytes[i+1] or 0, bytes[i+2] or 0
-        local n = b1*65536 + b2*256 + b3
-        result[#result+1] = B64CHARS:sub(math.floor(n/262144)%64+1, math.floor(n/262144)%64+1)
-        result[#result+1] = B64CHARS:sub(math.floor(n/4096)%64+1, math.floor(n/4096)%64+1)
-        result[#result+1] = bytes[i+1] and B64CHARS:sub(math.floor(n/64)%64+1, math.floor(n/64)%64+1) or "="
-        result[#result+1] = bytes[i+2] and B64CHARS:sub(n%64+1, n%64+1) or "="
-    end
-    return table.concat(result)
 end
 
-local function b64Decode(str)
-    local lookup = {}; for i=1,#B64CHARS do lookup[B64CHARS:sub(i,i)] = i-1 end
-    local bytes = {}
-    for i = 1, #str, 4 do
-        local c1 = lookup[str:sub(i,i)] or 0; local c2 = lookup[str:sub(i+1,i+1)] or 0
-        local c3 = lookup[str:sub(i+2,i+2)]; local c4 = lookup[str:sub(i+3,i+3)]
-        local n = c1*262144 + c2*4096 + (c3 or 0)*64 + (c4 or 0)
-        bytes[#bytes+1] = string.char(math.floor(n/65536)%256)
-        if c3 then bytes[#bytes+1] = string.char(math.floor(n/256)%256) end
-        if c4 then bytes[#bytes+1] = string.char(n%256) end
-    end
-    return table.concat(bytes)
-end
+end) -- End of pcall wrapper
 
-local CONFIG_PATH = "WindUI/v1prware/config/v1prware.json"
-
-secConfigShare:Button({
-    Title = "📋 Copy Config",
-    Icon = "copy",
-    Callback = function()
-        pcall(function()
-            local ok,e = pcall(function()
-                local raw = readfile(CONFIG_PATH)
-                setclipboard("v1prw_full:"..b64Encode(raw))
-                print("[v1prware] Config copied!")
-            end)
-            if not ok then print("[v1prware] Copy failed: "..tostring(e)) end
-        end)
-    end
-})
-
-local importStr = ""
-
-secConfigShare:Input({
-    Title = "Paste Config String",
-    Icon = "clipboard",
-    Placeholder = "v1prw_full:...",
-    Callback = function(v) pcall(function() importStr = v end) end
-})
-
-secConfigShare:Button({
-    Title = "🔄 Load Config",
-    Icon = "download",
-    Callback = function()
-        pcall(function()
-            if importStr == "" then print("[v1prware] Paste a config string first"); return end
-            if importStr:match("^v1prw_full:") then
-                local ok,e = pcall(function()
-                    local d = b64Decode(importStr:sub(12))
-                    writefile(CONFIG_PATH, d)
-                    v1prConfig:Load()
-                    applyConfigFromFlags()
-                end)
-                if ok then print("[v1prware] Config loaded!") else print("[v1prware] Load failed: "..tostring(e)) end
-            else
-                print("[v1prware] Must start with v1prw_full:")
-            end
-        end)
-    end
-})
-
-secConfigShare:Button({
-    Title = "💾 Save Config",
-    Icon = "save",
-    Callback = function() pcall(function() v1prConfig:Save(); print("[v1prware] Config saved") end) end
-})
-
-end -- interface tab
 -- ============================================================
--- CONFIG APPLY
+-- ERROR HANDLING
 -- ============================================================
 
-function applyConfigFromFlags()
-    pcall(function()
-        task.wait(0.5)
-        if not (win and win.Flags) then return end
-        print("[v1prware] Applying config flags...")
-        
-        if win.Flags.spoofActive ~= nil then spoofActive=win.Flags.spoofActive; if spoofActive then spoofStart() else spoofStop() end end
-        if win.Flags.chatForceEnabled ~= nil then chatForceEnabled=win.Flags.chatForceEnabled; if chatForceConn then chatForceConn:Disconnect(); chatForceConn=nil end; if chatForceEnabled then enforceChatOn(); chatForceConn=svc.Run.Heartbeat:Connect(enforceChatOn) end end
-        if win.Flags.timerSide ~= nil then timerSide=type(win.Flags.timerSide)=="table" and win.Flags.timerSide[1] or win.Flags.timerSide; applyTimerPos() end
-        if win.Flags.platEnabled ~= nil then platEnabled=win.Flags.platEnabled; if platEnabled then platStart() else platStop() end end
-        if win.Flags.platDevice ~= nil then platDevice=win.Flags.platDevice end
-        if win.Flags.stamOn ~= nil then stam.on=win.Flags.stamOn end
-        if win.Flags.stamNoLoss ~= nil then stam.noLoss=win.Flags.stamNoLoss end
-        if type(win.Flags.stamLoss)=="number" then stam.loss=win.Flags.stamLoss end
-        if type(win.Flags.stamGain)=="number" then stam.gain=win.Flags.stamGain end
-        if type(win.Flags.stamMax)=="number" then stam.max=win.Flags.stamMax end
-        if type(win.Flags.stamCurrent)=="number" then stam.current=win.Flags.stamCurrent end
-        if stam.on or stam.noLoss then stamStart() end; if stam.noLoss then stamApply() end
-        if win.Flags.speedOn ~= nil then speedHack.on=win.Flags.speedOn; if speedHack.on then speedStart() end end
-        if type(win.Flags.speedValue)=="number" then speedHack.speed=win.Flags.speedValue; speedHack.lastApplied=0 end
-        if win.Flags.hbOn ~= nil then hb.on=win.Flags.hbOn; if hb.on then hbStart() else hbStop() end end
-        if type(win.Flags.hbStrength)=="number" then hb.strength=win.Flags.hbStrength end
-        if win.Flags.acOn ~= nil then ac.on=win.Flags.acOn; if not ac.on then for k in pairs(ac.active) do ac.active[k]=nil end; ac.chaseTarget=nil; ac.damageTarget=nil end end
-        if type(win.Flags.acStrength)=="number" then ac.strength=win.Flags.acStrength end
-        if type(win.Flags.acMaxDist)=="number" then ac.maxDist=win.Flags.acMaxDist end
-        if win.Flags.flowOn ~= nil then flow.on=win.Flags.flowOn end
-        if type(win.Flags.flowNodeDelay)=="number" then flow.nodeDelay=win.Flags.flowNodeDelay end
-        if type(win.Flags.flowLineDelay)=="number" then flow.lineDelay=win.Flags.flowLineDelay end
-        if win.Flags.aimOn ~= nil then aim.on=win.Flags.aimOn end
-        if type(win.Flags.aimCooldown)=="number" then aim.cooldown=win.Flags.aimCooldown end
-        if type(win.Flags.aimLockTime)=="number" then aim.lockTime=win.Flags.aimLockTime end
-        if type(win.Flags.aimMaxDist)=="number" then aim.maxDist=win.Flags.aimMaxDist end
-        if type(win.Flags.aimSmooth)=="number" then aim.smooth=win.Flags.aimSmooth end
-        if not aim.on then aimUnlock() end
-        if win.Flags.absOn ~= nil then abs.on=win.Flags.absOn; if abs.on then absStart() else absStop() end end
-        if type(win.Flags.absRange)=="number" then abs.range=win.Flags.absRange end
-        if type(win.Flags.absDur)=="number" then abs.duration=win.Flags.absDur end
-        if win.Flags.sixerStrafeOn ~= nil then sixerStrafeOn=win.Flags.sixerStrafeOn end
-        if win.Flags.coolkidWSOOn ~= nil then coolkidWSOOn=win.Flags.coolkidWSOOn end
-        if win.Flags.noliVoidRushOn ~= nil then noliVoidRushOn=win.Flags.noliVoidRushOn; if not noliVoidRushOn then noliStop() end end
-        if win.Flags.qteOn ~= nil then qte.on = win.Flags.qteOn; if qte.on then qteStart() else qteStop() end end
-        if type(win.Flags.qteSpeed)=="number" then qte.speed = win.Flags.qteSpeed end
-        if win.Flags.batsAimOn ~= nil then batsAim.on=win.Flags.batsAimOn end
-        if type(win.Flags.batsPrediction)=="number" then batsAim.prediction=win.Flags.batsPrediction end
-        if type(win.Flags.batsDepthOffset)=="number" then batsAim.depthOffset=win.Flags.batsDepthOffset end
-        if type(win.Flags.batsMaxDist)=="number" then batsAim.maxDist=win.Flags.batsMaxDist end
-        if win.Flags.espEnabled ~= nil then esp.enabled=win.Flags.espEnabled; if esp.enabled then espStart() else espStop() end end
-        if win.Flags.espKillers ~= nil then esp.showKillers=win.Flags.espKillers end
-        if win.Flags.espSurvivors ~= nil then esp.showSurvivors=win.Flags.espSurvivors end
-        if win.Flags.espGenerators ~= nil then esp.showGenerators=win.Flags.espGenerators end
-        if win.Flags.espItems ~= nil then esp.showItems=win.Flags.espItems end
-        if win.Flags.espStructures ~= nil then esp.showStructures=win.Flags.espStructures end
-        if win.Flags.espPizza ~= nil then mset.pizza=win.Flags.espPizza end
-        if win.Flags.espZombie ~= nil then mset.zombie=win.Flags.espZombie end
-        if win.Flags.espPuddle ~= nil then mset.puddle=win.Flags.espPuddle end
-        if type(win.Flags.espMaxDistance)=="number" then esp.maxDistance=win.Flags.espMaxDistance end
-        if type(win.Flags.espTransparency)=="number" then esp.transparency=win.Flags.espTransparency end
-        if type(win.Flags.espScanRate)=="number" then esp.scanRate=win.Flags.espScanRate end
-        if type(win.Flags.espMinionTrans)=="number" then mset.transparency=win.Flags.espMinionTrans; updateTransparency() end
-        if win.Flags.musicOn ~= nil then music.on=win.Flags.musicOn; if music.on then if music.thread then task.cancel(music.thread) end; music.thread=task.spawn(musicMonitor) else if music.thread then task.cancel(music.thread); music.thread=nil end; musicReset() end end
-        if win.Flags.musicSel ~= nil then music.selected=win.Flags.musicSel end
-        
-        print("[v1prware] All features restored from config!")
-    end)
-end
-
-task.spawn(function()
-    while true do task.wait(2); pcall(function() v1prConfig:Save() end) end
-end)
-
-task.spawn(function()
-    pcall(function()
-        task.wait(1.5)
-        pcall(function() v1prConfig:Load() end)
-        task.defer(function()
-            print("[v1prware] Syncing flags...")
-            if win and win.Flags then applyConfigFromFlags() else print("[v1prware] win.Flags not yet available") end
-        end)
-    end)
-end)
-
-print("[v1prware] Loaded successfully")
-
-end) -- End of main pcall
-
--- Error handling
-if not success then
+if success then
+    print("[v1prware] ✓ Loaded successfully")
+else
     local errMsg = tostring(err)
-    warn("V1PRWARE failed to load: " .. errMsg)
-    print("V1PRWARE encountered an error: " .. errMsg)
-    flashError(errMsg)
+    warn("[v1prware] ✗ Error loading: " .. errMsg)
+    print("[v1prware] Error details: " .. errMsg)
 end
