@@ -799,8 +799,8 @@ local hb = { on = false, strength = 50, conn = nil, active = {} }
 
 local hbAbilities = {
     Slash=1,Swing=1,Dagger=1,Punch=1,PlasmaBeam=1,Shoot=1,Behead=1,
-    GashingWound=1,WalkspeedOverride=1,Stab=1,Nova=1,MassInfection=1,
-    Axe=1,["INFERNALCRY"]=1,["Carving Slash"]=1,Carving=1,
+    GashingWound=1,WalkspeedOverride=1,Stab=1,
+    Axe=1,["INFERNALCRY"]=1,["Carving Slash"]=1,Carving=1,Preforating,
 }
 
 local function hbReadName(raw)
@@ -1623,8 +1623,18 @@ local function azureDetectFromMap()
     local bulbFolder = mc:FindFirstChild("GroundBulbModel")
     local vineFolder = mc:FindFirstChild("VineModel")
     
-    if bulbFolder and #bulbFolder:GetChildren() > 0 then return true end
-    if vineFolder and #vineFolder:GetChildren() > 0 then return true end
+    -- Check if folders exist and have children
+    if bulbFolder then
+        local bulbCount = 0
+        for _ in ipairs(bulbFolder:GetChildren()) do bulbCount += 1 end
+        if bulbCount > 0 then return true end
+    end
+    
+    if vineFolder then
+        local vineCount = 0
+        for _ in ipairs(vineFolder:GetChildren()) do vineCount += 1 end
+        if vineCount > 0 then return true end
+    end
     
     return false
 end
@@ -2305,9 +2315,19 @@ local function scanBulbs()
             if mc then
                 local bulbFolder = mc:FindFirstChild("GroundBulbModel")
                 if bulbFolder then
+                    -- Check all direct Model children
+                    for _, child in ipairs(bulbFolder:GetChildren()) do
+                        if child:IsA("Model") and not tracked.bulb[child] then
+                            addHighlight(child, Color3.fromRGB(200, 100, 255), "bulb", "AZURE SEEKER BULB", 3)
+                        end
+                    end
+                    -- Also check BaseParts in descendants for plant bodies
                     for _, o in ipairs(bulbFolder:GetDescendants()) do 
                         if o:IsA("BasePart") and o.Name ~= "Holder" and not tracked.bulb[o] then 
-                            addPlantCircle(o, Color3.fromRGB(200, 100, 255), "bulb", "AZURE SEEKER BULB", 45)
+                            local isTopLevelPart = o.Parent == bulbFolder
+                            if isTopLevelPart then
+                                addPlantCircle(o, Color3.fromRGB(200, 100, 255), "bulb", "AZURE SEEKER BULB", 45)
+                            end
                         end 
                     end 
                 end
@@ -2323,9 +2343,19 @@ local function scanVines()
             if mc then
                 local vineFolder = mc:FindFirstChild("VineModel")
                 if vineFolder then
+                    -- Check all direct Model children
+                    for _, child in ipairs(vineFolder:GetChildren()) do
+                        if child:IsA("Model") and not tracked.vine[child] then
+                            addHighlight(child, Color3.fromRGB(200, 100, 255), "vine", "AZURE VINE TRAP", 3)
+                        end
+                    end
+                    -- Also check BaseParts in descendants for plant bodies
                     for _, o in ipairs(vineFolder:GetDescendants()) do 
                         if o:IsA("BasePart") and o.Name ~= "Holder" and not tracked.vine[o] then 
-                            addPlantCircle(o, Color3.fromRGB(200, 100, 255), "vine", "AZURE VINE TRAP", 20)
+                            local isTopLevelPart = o.Parent == vineFolder
+                            if isTopLevelPart then
+                                addPlantCircle(o, Color3.fromRGB(200, 100, 255), "vine", "AZURE VINE TRAP", 20)
+                            end
                         end 
                     end 
                 end
@@ -2355,8 +2385,15 @@ local function scanC00lkiddMinions()
                 if config then
                     local minions = config:FindFirstChild("Minions")
                     if minions then
+                        -- Check all descendants of Minions folder
+                        for _, minionDef in ipairs(minions:GetDescendants()) do
+                            if (minionDef:IsA("Model") or minionDef:IsA("BasePart")) and not tracked.mafiaso[minionDef] then
+                                addHighlight(minionDef, Color3.fromRGB(180, 90, 0), "mafiaso", "MAFIASO MINION", 3)
+                            end
+                        end
+                        -- Also check direct children
                         for _, minionDef in ipairs(minions:GetChildren()) do
-                            if not tracked.mafiaso[minionDef] then
+                            if (minionDef:IsA("Model") or minionDef:IsA("BasePart")) and not tracked.mafiaso[minionDef] then
                                 addHighlight(minionDef, Color3.fromRGB(180, 90, 0), "mafiaso", "MAFIASO MINION", 3)
                             end
                         end
@@ -2372,8 +2409,15 @@ local function scanC00lkiddMinions()
                 if config then
                     local minions = config:FindFirstChild("Minions")
                     if minions then
+                        -- Check all descendants of Minions folder
+                        for _, minionDef in ipairs(minions:GetDescendants()) do
+                            if (minionDef:IsA("Model") or minionDef:IsA("BasePart")) and not tracked.gourd[minionDef] then
+                                addHighlight(minionDef, Color3.fromRGB(150, 200, 50), "gourd", "GOURD MINION", 3)
+                            end
+                        end
+                        -- Also check direct children
                         for _, minionDef in ipairs(minions:GetChildren()) do
-                            if not tracked.gourd[minionDef] then
+                            if (minionDef:IsA("Model") or minionDef:IsA("BasePart")) and not tracked.gourd[minionDef] then
                                 addHighlight(minionDef, Color3.fromRGB(150, 200, 50), "gourd", "GOURD MINION", 3)
                             end
                         end
@@ -2389,8 +2433,15 @@ local function scanC00lkiddMinions()
                 if config then
                     local minions = config:FindFirstChild("Minions")
                     if minions then
+                        -- Check all descendants of Minions folder
+                        for _, minionDef in ipairs(minions:GetDescendants()) do
+                            if (minionDef:IsA("Model") or minionDef:IsA("BasePart")) and not tracked.cupcakes[minionDef] then
+                                addHighlight(minionDef, Color3.fromRGB(255, 150, 200), "cupcakes", "CUPCAKES MINION", 3)
+                            end
+                        end
+                        -- Also check direct children
                         for _, minionDef in ipairs(minions:GetChildren()) do
-                            if not tracked.cupcakes[minionDef] then
+                            if (minionDef:IsA("Model") or minionDef:IsA("BasePart")) and not tracked.cupcakes[minionDef] then
                                 addHighlight(minionDef, Color3.fromRGB(255, 150, 200), "cupcakes", "CUPCAKES MINION", 3)
                             end
                         end
